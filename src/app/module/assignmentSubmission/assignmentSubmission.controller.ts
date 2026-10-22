@@ -4,6 +4,7 @@ import { getAuthSession } from "../../middleware/checkAuth";
 import { CatchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 import { AssignmentSubmissionService } from "./assignmentSubmission.service";
+import { parseAssignmentId } from "../assignment/assignment.validation";
 
 const submitAssignment = CatchAsync(async (req: Request, res: Response) => {
   const result = await AssignmentSubmissionService.submitAssignment(
@@ -18,4 +19,17 @@ const submitAssignment = CatchAsync(async (req: Request, res: Response) => {
   });
 });
 
-export const AssignmentSubmissionController = { submitAssignment };
+const getMySubmission = CatchAsync(async (req: Request, res: Response) => {
+  const result = await AssignmentSubmissionService.getMySubmission(
+    getAuthSession(res).user.id,
+    parseAssignmentId(req.params.assignmentId),
+  );
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Your submission fetched successfully",
+    data: result,
+  });
+});
+
+export const AssignmentSubmissionController = { submitAssignment, getMySubmission };

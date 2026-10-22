@@ -1,9 +1,12 @@
+import { APIError } from "better-auth/api";
 import {
   SubmissionProgressState,
   SubmissionStatus,
 } from "../../../generated/prisma/enums";
+import { prisma } from "../../lib/prisma";
 import {
   getNextAssignment,
+  getStudentProfile,
   getUnlockedAssignment,
   withStudentTransaction,
 } from "../assignment/assignment.access";
@@ -57,4 +60,31 @@ const submitAssignment = async (userId: string, payload: unknown) => {
   });
 };
 
-export const AssignmentSubmissionService = { submitAssignment };
+const getMySubmission = async (userId: string, assignmentId: string) => {
+  const student = await getStudentProfile(prisma, userId);
+  await getUnlockedAssignment(prisma, student.id, assignmentId);
+
+  const submission = await prisma.assignmentSubmission.findFirst({
+    where: { studentId: student.id, assignmentId },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    include: {
+      revisions: {
+        orderBy: { version: "desc" },
+        include: {
+          reviews: {
+            orderBy: [{ reviewedAt: "desc" }, { id: "desc" }],
+            include: { mentor: { select: { id: true, name: true } } },
+          },
+        },
+      },
+    },
+  });
+  if (!submission) {
+    throw new APIError("NOT_FOUND", {
+      message: "You have not submitted this assignment.",
+    });
+  }
+  return submission;
+};
+
+export const AssignmentSubmissionService = { submitAssignment, getMySubmission };

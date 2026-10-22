@@ -1,7 +1,9 @@
 import { APIError } from "better-auth/api";
 import { SubmissionProgressState } from "../../../generated/prisma/enums";
+import { prisma } from "../../lib/prisma";
 import {
   getNextAssignment,
+  getStudentProfile,
   getUnlockedAssignment,
   withStudentTransaction,
 } from "../assignment/assignment.access";
@@ -32,4 +34,20 @@ const skipAssignment = async (userId: string, payload: unknown) => {
   });
 };
 
-export const SubmissionSkipService = { skipAssignment };
+const getMySkip = async (userId: string, assignmentId: string) => {
+  const student = await getStudentProfile(prisma, userId);
+  await getUnlockedAssignment(prisma, student.id, assignmentId);
+
+  const skip = await prisma.submissionSkip.findFirst({
+    where: { studentId: student.id, assignmentId },
+    orderBy: [{ skippedAt: "desc" }, { id: "desc" }],
+  });
+  if (!skip) {
+    throw new APIError("NOT_FOUND", {
+      message: "You have not skipped this assignment.",
+    });
+  }
+  return skip;
+};
+
+export const SubmissionSkipService = { skipAssignment, getMySkip };

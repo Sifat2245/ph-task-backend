@@ -6,4 +6,5 @@ import { AssignmentSubmissionController } from "./assignmentSubmission.controlle
 export const assignmentSubmissionRoutes = Router();
 
 assignmentSubmissionRoutes.use(checkAuth(UserRole.STUDENT));
+assignmentSubmissionRoutes.get("/get-my-submission/:assignmentId", AssignmentSubmissionController.getMySubmission);
 assignmentSubmissionRoutes.post("/submit-assignment", AssignmentSubmissionController.submitAssignment);

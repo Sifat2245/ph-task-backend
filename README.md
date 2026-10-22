@@ -225,6 +225,19 @@ Both student modules follow the route/controller/service/validation structure:
 | --- | --- | --- |
 | POST | `/api/v1/assignment-submission/submit-assignment` | `assignmentId`, `submissionItems`, `note` |
 | POST | `/api/v1/submission-skip/skip-assignment` | `assignmentId`, `reason` |
+| GET | `/api/v1/assignment-submission/get-my-submission/:assignmentId` | None |
+| GET | `/api/v1/submission-skip/get-my-skip/:assignmentId` | None |
+
+Both GET routes use the assignment UUID in the URL and return only the signed-in
+student's records. Student IDs supplied in query parameters cannot select
+another student's data. Successful reads return `200` with `statusCode`,
+`success`, `message`, and `data` in the response body. Submission data includes
+all revisions ordered newest first, with reviews and the mentor's ID and name.
+The skip route returns the most recent skip record; it remains available as
+history if the student later submits the assignment. An existing, unlocked
+assignment with no corresponding record returns `404`. Invalid IDs return `400`,
+unknown assignments return `404`, and locked assignments return `403`. These
+routes require the `STUDENT` role and do not change progress or unlock assignments.
 
 For example, submit the first assignment after signing in as a student:
 
@@ -247,7 +260,7 @@ Or skip it:
 
 Use the assignment UUID from the assignment list. Submission items, notes,
 and skip reasons are required non-whitespace strings. Unknown fields are
-rejected. Both routes require the `STUDENT` role and return `201` on success.
+rejected. Both POST routes require the `STUDENT` role and return `201` on success.
 Submitting returns `submission`, `revision`, `progress`, and `nextAssignment`;
 skipping returns `skip`, `progress`, and `nextAssignment`. `nextAssignment`
 contains the next assignment's ID, number, and title, or `null` after the last
