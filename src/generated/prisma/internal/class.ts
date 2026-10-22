@@ -20,7 +20,7 @@ const config: runtime.GetPrismaClientConfig = {
   "clientVersion": "7.10.1",
   "engineVersion": "d1b3f377ca835d73fd50954a5e22128b9ebdd6b8",
   "activeProvider": "postgresql",
-  "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  output   = \"../src/generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nenum UserRole {\n  admin   @map(\"ADMIN\")\n  student @map(\"STUDENT\")\n  mentor  @map(\"MENTOR\")\n}\n\nmodel User {\n  id           String   @id @default(uuid()) @db.Uuid\n  studentId    String?  @unique\n  name         String\n  email        String   @unique\n  passwordHash String\n  role         UserRole @default(student)\n  createdById  String?  @db.Uuid\n  createdAt    DateTime @default(now())\n\n  createdBy    User?  @relation(\"UserCreatedBy\", fields: [createdById], references: [id], onDelete: SetNull)\n  createdUsers User[] @relation(\"UserCreatedBy\")\n}\n",
+  "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  output   = \"../../src/generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nenum UserRole {\n  admin   @map(\"ADMIN\")\n  student @map(\"STUDENT\")\n  mentor  @map(\"MENTOR\")\n}\n\nmodel User {\n  id           String   @id @default(uuid()) @db.Uuid\n  studentId    String?  @unique\n  name         String\n  email        String   @unique\n  passwordHash String\n  role         UserRole @default(student)\n  createdById  String?  @db.Uuid\n  createdAt    DateTime @default(now())\n\n  createdBy    User?  @relation(\"UserCreatedBy\", fields: [createdById], references: [id], onDelete: SetNull)\n  createdUsers User[] @relation(\"UserCreatedBy\")\n}\n",
   "runtimeDataModel": {
     "models": {},
     "enums": {},
