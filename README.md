@@ -9,10 +9,13 @@ npm install
 npm run dev
 ```
 
-The server defaults to `http://localhost:3000`. To configure the port, create a
-`.env` file in the project root:
+Copy `.env.example` to `.env` in the project root and fill in all required values.
+`src/config/env.ts` loads and validates the configuration used by the server,
+Better Auth, the Prisma client, and Prisma CLI. For example, set the environment
+and port with:
 
 ```dotenv
+NODE_ENV=development
 PORT=4000
 ```
 
@@ -36,13 +39,41 @@ npx prisma migrate dev --name init
 npx prisma generate
 ```
 
+Seed the five assignments, one admin, and five mentors:
+
+```sh
+npm run seed
+```
+
+New development seed accounts use these credentials by default:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@example.com` | `Admin123!` |
+| Mentor | `mentor1@example.com` through `mentor5@example.com` | `Mentor123!` |
+
+Set `SEED_ADMIN_PASSWORD` and `SEED_MENTOR_PASSWORD` in `.env` before seeding to
+choose different passwords for new accounts. The seed uses Better Auth sign-up
+to create credential accounts, assigns the requested roles, and records the admin
+as each new mentor's creator. It removes the sessions created during seeding.
+Admin and mentor accounts have a null student ID and no `Student` profile.
+
+Rerunning the seed updates assignments by their unique assignment number and
+keeps existing account IDs, passwords, and sessions. It stops if a seed email
+belongs to a different role or has no credential password. The assignment data
+is stored in `prisma/seed-data.ts` and the script in `prisma/seed.ts`.
+
 Available endpoints:
 
 - `GET /` returns a welcome message.
 - `GET /health` returns `{ "status": "ok" }`.
-- `POST /api/v1/auth/create-student` registers a student and returns `201`; duplicate emails
+- `POST /api/v1/auth/signup` registers a student and returns `201`; duplicate emails
   return `422`, and invalid requests return `400`.
 - `POST /api/v1/user` uses the same student creation service for compatibility.
+- `POST /api/v1/auth/signin` signs in using Better Auth and returns a session token
+  in `data.token`, the user in `data.user`, and authentication cookies.
+- `POST /api/v1/auth/logout` signs out the session identified by the request's
+  cookies, deletes that session, and clears authentication cookies.
 - `POST /api/auth/sign-in/email` signs in with email and password.
 - `GET /api/auth/get-session` returns the current session and user.
 
@@ -53,7 +84,7 @@ Set `BETTER_AUTH_SECRET` to a random secret of at least 32 characters and
 Test student registration (adjust the port to match `.env`):
 
 ```sh
-curl -X POST http://localhost:3000/api/v1/auth/create-student \
+curl -X POST http://localhost:3000/api/v1/auth/signup \
   -H 'Content-Type: application/json' \
   -d '{"name":"Test Student","email":"student@example.test","password":"TestPassword123!"}'
 ```
@@ -70,22 +101,46 @@ three digits, so numbering continues correctly after `STU-999` as `STU-1000`.
 
 Users have the `ADMIN`, `MENTOR`, or `STUDENT` role, defaulting to `STUDENT`.
 Student registration follows the auth module's route, controller, and service.
-`AuthService.createStudent` validates the request, hashes the password using Better
-Auth's configured hasher, and creates the user, credential account, and student
-profile in one Prisma transaction. Student ID allocation is part of this service;
+`AuthService.createStudent` calls `auth.api.signUpEmail`, letting Better Auth
+validate credentials and create the user, credential account, and session. A
+subsequent Prisma transaction assigns the student ID and creates the `Student`
+profile. If this transaction fails, the catch block deletes the newly registered
+user; its accounts and sessions are deleted through cascading relations.
 `auth.ts` contains configuration without user creation hooks.
+
+Successful registration returns `data.session`, `data.user`, and `data.student`.
+`data.session.token` is Better Auth's session token. Controllers forward
+Better Auth's `Set-Cookie` headers after the profile transaction succeeds, so the
+returned cookies can immediately be used with `/api/auth/get-session`. Failed
+registration does not forward authentication cookies.
+
+Sign in and save the session cookies, then use them to log out:
+
+```sh
+curl -c cookies.txt -X POST http://localhost:3000/api/v1/auth/signin \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"student@example.test","password":"TestPassword123!","rememberMe":true}'
+
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:3000/api/v1/auth/logout
+```
+
+`rememberMe` is optional and defaults to `true`; set it to `false` for a
+non-persistent session cookie. Invalid credentials return `401`, and invalid
+sign-in requests return `400`. Logout is safe to repeat when the session is
+already gone and leaves other sessions and the user account in place.
 
 The `Student` model has a unique `userId` relation to `User`. Names, emails, roles,
 and student IDs stay on the user record. New records use UUIDs. The `role`,
 `studentId`, and `createdById` fields are controlled by the server; extra request
-fields are ignored during registration. Better Auth's generic sign-up endpoint
-is disabled so registration always creates the student profile. Use its sign-in
-and session endpoints after registering.
+fields are ignored during registration. The generic HTTP sign-up endpoint is
+blocked so registration always goes through the student service. Better Auth's
+server-side sign-up API remains enabled for the service.
 
 The optional `createdById` relation records who created an account. Deleting the
 creator clears this reference without deleting the accounts they created.
-Students require a non-empty student ID, while mentors and admins can have a
-null student ID. Better Auth stores password hashes in `Account.password`;
+The student ID can be null while Better Auth registration is pending. The
+profile transaction assigns a non-empty student ID before registration succeeds;
+mentors and admins can keep a null student ID. Better Auth stores password hashes in `Account.password`;
 the user model and user responses do not contain passwords.
 
 Apply the pending migrations and regenerate the Prisma client after pulling

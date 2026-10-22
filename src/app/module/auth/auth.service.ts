@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
 import { APIError } from "better-auth/api";
-import { Prisma, UserRole } from "../../../generated/prisma/client";
+import { UserRole } from "../../../generated/prisma/enums";
 import { auth } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 
@@ -10,11 +9,16 @@ type CreateStudentInput = {
   password: string;
 };
 
-// Use the same email format as Better Auth's sign-in endpoint.
-const emailPattern =
-  /^(?:[A-Za-z0-9_'+-]+\.)*[A-Za-z0-9_'+-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$/;
+type SignInInput = {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+};
 
-const createStudent = async (payload: CreateStudentInput) => {
+const createStudent = async (
+  payload: CreateStudentInput,
+  headers?: Headers,
+) => {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new APIError("BAD_REQUEST", {
       message: "Student details are required.",
@@ -25,80 +29,109 @@ const createStudent = async (payload: CreateStudentInput) => {
     throw new APIError("BAD_REQUEST", { message: "Name is required." });
   }
 
-  if (
-    typeof payload.email !== "string" ||
-    !emailPattern.test(payload.email.trim())
-  ) {
-    throw new APIError("BAD_REQUEST", {
-      message: "A valid email is required.",
+  const registration = await auth.api.signUpEmail({
+    body: {
+      name: payload.name.trim(),
+      email:
+        typeof payload.email === "string"
+          ? payload.email.trim()
+          : payload.email,
+      password: payload.password,
+    },
+    headers,
+    returnHeaders: true,
+  });
+
+  const { user: registeredUser, token } = registration.response;
+  if (!registeredUser) {
+    throw new APIError("INTERNAL_SERVER_ERROR", {
+      message: "Failed to register student.",
     });
   }
-
-  const context = await auth.$context;
-  const { minPasswordLength, maxPasswordLength } = context.password.config;
-  if (
-    typeof payload.password !== "string" ||
-    payload.password.length < minPasswordLength ||
-    payload.password.length > maxPasswordLength
-  ) {
-    throw new APIError("BAD_REQUEST", {
-      message: `Password must be between ${minPasswordLength} and ${maxPasswordLength} characters.`,
-    });
-  }
-
-  const email = payload.email.trim().toLowerCase();
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    throw new APIError("UNPROCESSABLE_ENTITY", {
-      message: "User already exists. Use another email.",
-    });
-  }
-
-  const password = await context.password.hash(payload.password);
-  const userId = randomUUID();
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    if (!token) {
+      throw new APIError("INTERNAL_SERVER_ERROR", {
+        message: "Failed to create registration session.",
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
       const [sequence] = await tx.$queryRaw<{ nextId: bigint }[]>`
         SELECT nextval('student_id_sequence'::regclass) AS "nextId"
       `;
 
       if (!sequence) throw new Error("Unable to generate a student ID.");
 
-      return tx.user.create({
+      const user = await tx.user.update({
+        where: { id: registeredUser.id },
         data: {
-          id: userId,
-          name: payload.name.trim(),
-          email,
           role: UserRole.STUDENT,
           studentId: `STU-${sequence.nextId.toString().padStart(3, "0")}`,
-          accounts: {
-            create: {
-              id: randomUUID(),
-              providerId: "credential",
-              accountId: userId,
-              password,
-            },
-          },
-          student: { create: {} },
         },
-        include: { student: true },
       });
+
+      const student = await tx.student.create({
+        data: { userId: registeredUser.id },
+      });
+
+      const session = await tx.session.findUniqueOrThrow({
+        where: { token },
+      });
+
+      return { session, user, student };
     });
+
+    return { headers: registration.headers, data: result };
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      throw new APIError("UNPROCESSABLE_ENTITY", {
-        message: "A user with this email or student ID already exists.",
-      });
+    try {
+      await prisma.user.delete({ where: { id: registeredUser.id } });
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        "Student registration failed.",
+        { cause: cleanupError },
+      );
     }
 
     throw error;
   }
 };
 
+const signIn = async (payload: SignInInput, headers?: Headers) => {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new APIError("BAD_REQUEST", {
+      message: "Sign-in details are required.",
+    });
+  }
+
+  const result = await auth.api.signInEmail({
+    body: {
+      email:
+        typeof payload.email === "string"
+          ? payload.email.trim()
+          : payload.email,
+      password: payload.password,
+      rememberMe: payload.rememberMe,
+    },
+    headers,
+    returnHeaders: true,
+  });
+
+  return { headers: result.headers, data: result.response };
+};
+
+const logout = async (headers: Headers) => {
+  const result = await auth.api.signOut({
+    headers,
+    returnHeaders: true,
+  });
+
+  return { headers: result.headers, data: result.response };
+};
+
 export const AuthService = {
   createStudent,
+  signIn,
+  logout,
 };

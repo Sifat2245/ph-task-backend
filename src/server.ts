@@ -1,7 +1,7 @@
-import "dotenv/config";
 import app from "./app";
+import { envVariables } from "./config/env";
 
-const port = Number(process.env.PORT ?? 3000);
+const port = Number(envVariables.PORT);
 
 const server = () => {
   try {

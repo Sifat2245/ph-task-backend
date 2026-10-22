@@ -1,16 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { envVariables } from "../../config/env";
 import { UserRole } from "../../generated/prisma/enums";
 import { prisma } from "./prisma";
 
 export const auth = betterAuth({
+  baseURL: envVariables.BETTER_AUTH_URL,
+  secret: envVariables.BETTER_AUTH_SECRET,
   database: prismaAdapter(prisma, {
     provider: "postgresql",
+    transaction: true,
   }),
   emailAndPassword: {
     enabled: true,
-    disableSignUp: true,
+    autoSignIn: true,
   },
   advanced: {
     database: {
@@ -39,5 +43,5 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [process.env.BETTER_AUTH_URL || "http://localhost:3000"],
+  trustedOrigins: [envVariables.BETTER_AUTH_URL],
 });

@@ -1,1 +1,10 @@
+model Assignment {
+  id               String   @id @default(uuid())
+  assignmentNumber Int      @unique
+  title            String
+  description      String   @db.Text
+  maxMarks         Int
+  createdAt        DateTime @default(now())
 
+  @@map("assignment")
+}
