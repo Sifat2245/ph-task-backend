@@ -19,6 +19,36 @@ NODE_ENV=development
 PORT=4000
 ```
 
+JWT helpers use `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` from `.env`.
+`tokenUtils.getAccessToken(payload)` expires after one day, and
+`tokenUtils.getRefreshToken(payload)` expires after seven days by default.
+Set `JWT_ACCESS_EXPIRES_IN` and `JWT_REFRESH_EXPIRES_IN` to change those durations
+(for example, `1d` and `7d`). Both helpers use `jwtUtils.createToken`.
+
+Cookie setters are available through `tokenUtils`:
+
+```ts
+tokenUtils.setAccessTokenCookie(res, result.data.accessToken);
+tokenUtils.setRefreshTokenCookie(res, result.data.refreshToken);
+tokenUtils.setBetterAuthSessionCookie(res, result.data.token);
+```
+
+Signup and signin set the `accessToken`, `refreshToken`, and `betterAuthSession`
+cookies and return those token values in the response. Their lifetimes use
+`JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`, and
+`BETTER_AUTH_SESSION_TOKEN_EXPIRES_IN`. Cookies use `HttpOnly`, `Secure`, and
+`SameSite=None`.
+
+The controllers also forward Better Auth's signed session and companion cookies,
+which `/api/auth/get-session` and protected routes use to resolve the session.
+Logout clears the three application cookies and Better Auth's cookies.
+
+Better Auth session lifetimes and refresh intervals use
+`BETTER_AUTH_SESSION_TOKEN_EXPIRES_IN` and
+`BETTER_AUTH_UPDATE_TOKEN_EXPIRES_IN`, both defaulting to `1d`. Durations are
+validated when the server starts; Express receives milliseconds and Better Auth
+receives seconds.
+
 Restart the development server after changing `.env`. You can also set `PORT`
 directly in the shell; it takes precedence over `.env`:
 
@@ -74,9 +104,13 @@ Available endpoints:
 - `GET /health` returns `{ "status": "ok" }`.
 - `POST /api/v1/auth/signup` registers a student and returns `201`; duplicate emails
   return `422`, and invalid requests return `400`.
-- `POST /api/v1/user` uses the same student creation service for compatibility.
+- `POST /api/v1/user/create-mentor` lets an admin create a mentor.
+- `GET /api/v1/user/get-all-mentors` lets an admin list all mentors.
+- `PUT /api/v1/user/update-mentor/:id` lets an admin update a mentor.
+- `DELETE /api/v1/user/delete-mentor/:id` lets an admin delete a mentor.
 - `POST /api/v1/auth/signin` signs in using Better Auth and returns a session token
-  in `data.token`, the user in `data.user`, and authentication cookies.
+  in `data.token`, the user in `data.user`, access and refresh JWTs, and
+  authentication cookies.
 - `POST /api/v1/auth/logout` signs out the session identified by the request's
   cookies, deletes that session, and clears authentication cookies.
 - `POST /api/auth/sign-in/email` signs in with email and password.
@@ -85,6 +119,48 @@ Available endpoints:
 Better Auth is mounted before `express.json()` so it can read request bodies.
 Set `BETTER_AUTH_SECRET` to a random secret of at least 32 characters and
 `BETTER_AUTH_URL` to the server URL, as shown in `.env.example`.
+
+Mentor management requires the signed-in admin's session and access token cookies.
+The middleware verifies the access JWT's signature and expiration and requires
+its `userId` to match the session user. Missing, invalid, expired, or mismatched
+credentials return `401`; authenticated students and mentors receive `403`.
+Refresh tokens are reserved for renewing access tokens and do not authorize
+protected requests. The middleware
+reads `betterAuthSession` with `cookieUtils` and looks up an unexpired Prisma
+session including its user. It checks the user's current database role and also
+accepts Better Auth's verified signed session cookie when the application cookie
+is absent. Admins and students cannot
+be updated or deleted through the mentor routes; those IDs return `404`.
+
+Create a mentor with `name`, `email`, `password`, and an optional `image` URL.
+`UserService.createUser` uses Better Auth's `signUpEmail`, then a Prisma
+transaction sets the `MENTOR` role and the admin's `createdById`, and removes the
+mentor's automatic signup session. It deletes the newly registered user if this
+transaction fails. The response contains the mentor; the admin stays signed in.
+
+Updates accept any non-empty combination of `name`, `email`, `password`, and
+`image`; use `image: null` to clear the image. Password changes use Better Auth's
+configured password hasher. Email and password changes revoke the mentor's
+sessions in the same transaction; changing email also clears `emailVerified`.
+Duplicate email updates return `409`, and duplicate signup emails return `422`.
+The mentor's role, creator, and student ID cannot be set in the request body.
+Deleting a mentor also deletes their credential accounts and sessions.
+
+For example, after signing in as the admin and saving cookies to `cookies.txt`:
+
+```sh
+curl -b cookies.txt -X POST http://localhost:3000/api/v1/user/create-mentor \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"New Mentor","email":"newmentor@example.com","password":"MentorPassword123!"}'
+
+curl -b cookies.txt http://localhost:3000/api/v1/user/get-all-mentors
+
+curl -b cookies.txt -X PUT http://localhost:3000/api/v1/user/update-mentor/MENTOR_USER_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Updated Mentor"}'
+
+curl -b cookies.txt -X DELETE http://localhost:3000/api/v1/user/delete-mentor/MENTOR_USER_ID
+```
 
 Test student registration (adjust the port to match `.env`):
 
@@ -113,11 +189,23 @@ profile. If this transaction fails, the catch block deletes the newly registered
 user; its accounts and sessions are deleted through cascading relations.
 `auth.ts` contains configuration without user creation hooks.
 
-Successful registration returns `data.session`, `data.user`, and `data.student`.
-`data.session.token` is Better Auth's session token. Controllers forward
+Successful registration returns `data.token`, `data.session`, `data.user`, `data.student`,
+`data.accessToken`, and `data.refreshToken`.
+`data.token` and `data.session.token` are Better Auth's session token. Controllers forward
 Better Auth's `Set-Cookie` headers after the profile transaction succeeds, so the
 returned cookies can immediately be used with `/api/auth/get-session`. Failed
 registration does not forward authentication cookies.
+
+Registration omits the initial session cache cookie, whose user data predates the
+student profile transaction, so the next session lookup reads the completed user.
+
+Both signup and signin return `data.accessToken` (one day by default) and
+`data.refreshToken` (seven days by default). These JWTs contain `userId`, `email`,
+and `role`, signed using the corresponding secrets configured in `.env`.
+Signup generates JWTs within the student profile transaction; if generation
+fails, registration is rolled back and the new Better Auth user is deleted.
+If JWT generation fails during signin, its newly created session is deleted.
+Protected routes validate Better Auth's session cookies.
 
 Sign in and save the session cookies, then use them to log out:
 

@@ -4,6 +4,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { envVariables } from "../../config/env";
 import { UserRole } from "../../generated/prisma/enums";
 import { prisma } from "./prisma";
+import ms from "ms";
 
 export const auth = betterAuth({
   baseURL: envVariables.BETTER_AUTH_URL,
@@ -21,6 +22,11 @@ export const auth = betterAuth({
       generateId: () => randomUUID(),
     },
     disableCSRFCheck: true,
+    defaultCookieAttributes: {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+    },
   },
   user: {
     additionalFields: {
@@ -40,6 +46,15 @@ export const auth = betterAuth({
         required: false,
         input: false,
       },
+    },
+  },
+
+  session: {
+    expiresIn: ms(envVariables.BETTER_AUTH_SESSION_TOKEN_EXPIRES_IN) / 1000,
+    updateAge: ms(envVariables.BETTER_AUTH_UPDATE_TOKEN_EXPIRES_IN) / 1000,
+    cookieCache: {
+      enabled: true,
+      maxAge: ms(envVariables.BETTER_AUTH_SESSION_TOKEN_EXPIRES_IN) / 1000,
     },
   },
 

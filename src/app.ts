@@ -4,6 +4,7 @@ import { auth } from "./app/lib/auth";
 import { routerIndex } from "./app/router";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { notFound } from "./app/middleware/notFound";
+import cookieParser from "cookie-parser";
 
 const app: Application = express();
 
@@ -17,6 +18,7 @@ app.post("/api/auth/sign-up/email", (_req: Request, res: Response) => {
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(express.json());
+app.use(cookieParser())
 
 app.use("/api/v1", routerIndex);
 

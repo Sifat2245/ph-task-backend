@@ -3,6 +3,8 @@ import { fromNodeHeaders } from "better-auth/node";
 import { CatchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 import { AuthService } from "./auth.service";
+import { tokenUtils } from "../../utils/token";
+import { cookieUtils } from "../../utils/cookie";
 
 const createStudent = CatchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.createStudent(
@@ -10,6 +12,12 @@ const createStudent = CatchAsync(async (req: Request, res: Response) => {
     fromNodeHeaders(req.headers),
   );
 
+  const { accessToken, refreshToken, token, ...rest } = result.data;
+  tokenUtils.setAccessTokenCookie(res, accessToken);
+  tokenUtils.setRefreshTokenCookie(res, refreshToken);
+  tokenUtils.setBetterAuthSessionCookie(res, token);
+
+  // Better Auth reads its signed session cookie when resolving a session.
   for (const cookie of result.headers.getSetCookie()) {
     res.append("Set-Cookie", cookie);
   }
@@ -18,7 +26,7 @@ const createStudent = CatchAsync(async (req: Request, res: Response) => {
     statusCode: 201,
     success: true,
     message: "Student created successfully",
-    data: result.data,
+    data: { token, accessToken, refreshToken, ...rest },
   });
 });
 
@@ -28,6 +36,11 @@ const signIn = CatchAsync(async (req: Request, res: Response) => {
     fromNodeHeaders(req.headers),
   );
 
+  const { accessToken, refreshToken, token, ...rest } = result.data;
+  tokenUtils.setAccessTokenCookie(res, accessToken);
+  tokenUtils.setRefreshTokenCookie(res, refreshToken);
+  tokenUtils.setBetterAuthSessionCookie(res, token);
+
   for (const cookie of result.headers.getSetCookie()) {
     res.append("Set-Cookie", cookie);
   }
@@ -36,7 +49,7 @@ const signIn = CatchAsync(async (req: Request, res: Response) => {
     statusCode: 200,
     success: true,
     message: "Signed in successfully",
-    data: result.data,
+    data: { token, accessToken, refreshToken, ...rest },
   });
 });
 
@@ -45,6 +58,10 @@ const logout = CatchAsync(async (req: Request, res: Response) => {
 
   for (const cookie of result.headers.getSetCookie()) {
     res.append("Set-Cookie", cookie);
+  }
+
+  for (const key of ["accessToken", "refreshToken", "betterAuthSession"]) {
+    cookieUtils.clearCookie(res, key, { secure: true, sameSite: "none" });
   }
 
   sendResponse(res, {

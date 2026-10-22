@@ -1,7 +1,9 @@
 import { APIError } from "better-auth/api";
+import type { User } from "../../../generated/prisma/client";
 import { UserRole } from "../../../generated/prisma/enums";
 import { auth } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
+import { tokenUtils } from "../../utils/token";
 
 type CreateStudentInput = {
   name: string;
@@ -13,6 +15,27 @@ type SignInInput = {
   email: string;
   password: string;
   rememberMe?: boolean;
+};
+
+const createAuthTokens = (
+  user: Pick<User, "id" | "email"> & { role?: UserRole | null },
+) => {
+  if (!user.role) {
+    throw new APIError("INTERNAL_SERVER_ERROR", {
+      message: "Cannot create tokens without a user role.",
+    });
+  }
+
+  const payload = {
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+  };
+
+  return {
+    accessToken: tokenUtils.getAccessToken(payload),
+    refreshToken: tokenUtils.getRefreshToken(payload),
+  };
 };
 
 const createStudent = async (
@@ -79,8 +102,18 @@ const createStudent = async (
         where: { token },
       });
 
-      return { session, user, student };
+      return { session, user, student, token, ...createAuthTokens(user) };
     });
+
+    // The signup cache contains the user before the student profile transaction.
+    const cacheName = (await auth.$context).authCookies.sessionData.name;
+    const cookies = registration.headers.getSetCookie();
+    registration.headers.delete("Set-Cookie");
+    for (const cookie of cookies) {
+      if (!cookie.startsWith(`${cacheName}=`) && !cookie.startsWith(`${cacheName}.`)) {
+        registration.headers.append("Set-Cookie", cookie);
+      }
+    }
 
     return { headers: registration.headers, data: result };
   } catch (error) {
@@ -118,7 +151,26 @@ const signIn = async (payload: SignInInput, headers?: Headers) => {
     returnHeaders: true,
   });
 
-  return { headers: result.headers, data: result.response };
+  try {
+    return {
+      headers: result.headers,
+      data: { ...result.response, ...createAuthTokens(result.response.user) },
+    };
+  } catch (error) {
+    try {
+      await prisma.session.deleteMany({
+        where: { token: result.response.token },
+      });
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        "Sign-in failed and session cleanup failed.",
+        { cause: cleanupError },
+      );
+    }
+
+    throw error;
+  }
 };
 
 const logout = async (headers: Headers) => {
