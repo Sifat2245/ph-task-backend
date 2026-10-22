@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import status from "http-status";
 import { fromNodeHeaders } from "better-auth/node";
 import { CatchAsync } from "../../shared/catchAsync";
 import { UserService } from "./user.service";
@@ -15,7 +16,7 @@ const createUser = CatchAsync(async (req: Request, res: Response) => {
   );
 
   sendResponse(res, {
-    statusCode: 201,
+    statusCode: status.CREATED,
     success: true,
     message: "Mentor created successfully",
     data: result,
@@ -25,7 +26,7 @@ const createUser = CatchAsync(async (req: Request, res: Response) => {
 const getUsers = CatchAsync(async (req: Request, res: Response) => {
   const result = await UserService.getUsers();
   sendResponse(res, {
-    statusCode: 200,
+    statusCode: status.OK,
     success: true,
     message: "Mentors fetched successfully",
     data: result,
@@ -35,7 +36,7 @@ const getUsers = CatchAsync(async (req: Request, res: Response) => {
 const updateUser = CatchAsync(async (req: Request, res: Response) => {
   const result = await UserService.updateUser(parseMentorId(req.params.id), req.body);
   sendResponse(res, {
-    statusCode: 200,
+    statusCode: status.OK,
     success: true,
     message: "Mentor updated successfully",
     data: result,
@@ -45,7 +46,7 @@ const updateUser = CatchAsync(async (req: Request, res: Response) => {
 const deleteUser = CatchAsync(async (req: Request, res: Response) => {
   const result = await UserService.deleteUser(parseMentorId(req.params.id));
   sendResponse(res, {
-    statusCode: 200,
+    statusCode: status.OK,
     success: true,
     message: "Mentor deleted successfully",
     data: result,

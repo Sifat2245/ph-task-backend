@@ -1,7 +1,19 @@
 import { APIError } from "better-auth/api";
 import { Prisma } from "../../../generated/prisma/client";
+import { UserRole } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { parseCreateAssignment, parseUpdateAssignment } from "./assignment.validation";
+import { getStudentProfile, getUnlockedAssignment } from "./assignment.access";
+
+type AssignmentViewer = { id: string; role?: UserRole | null };
+
+const isStaff = (user: AssignmentViewer): boolean => {
+  if (user.role === UserRole.ADMIN || user.role === UserRole.MENTOR) return true;
+  if (user.role !== UserRole.STUDENT) {
+    throw new APIError("FORBIDDEN", { message: "A valid user role is required." });
+  }
+  return false;
+};
 
 const rethrowAssignmentError = (error: unknown): never => {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -41,11 +53,39 @@ const createAssignment = async (payload: unknown) => {
   }
 };
 
-const getAllAssignments = async () => {
-  return prisma.assignment.findMany({ orderBy: { assignmentNumber: "asc" } });
+const getAllAssignments = async (user: AssignmentViewer) => {
+  if (isStaff(user)) {
+    return prisma.assignment.findMany({ orderBy: { assignmentNumber: "asc" } });
+  }
+  const student = await getStudentProfile(prisma, user.id);
+  const assignments = await prisma.assignment.findMany({
+    orderBy: { assignmentNumber: "asc" },
+    include: { submissionProgress: { where: { studentId: student.id }, select: { state: true } } },
+  });
+  let previousAssignmentsCompleted = true;
+  return assignments.map(({ submissionProgress, ...assignment }) => {
+    const progressState = submissionProgress[0]?.state ?? null;
+    const isLocked = !previousAssignmentsCompleted;
+    previousAssignmentsCompleted = previousAssignmentsCompleted && progressState !== null;
+    return {
+      ...assignment,
+      description: isLocked ? null : assignment.description,
+      isLocked,
+      progressState,
+    };
+  });
 };
 
-const getSingleAssignment = async (id: string) => {
+const getSingleAssignment = async (id: string, user: AssignmentViewer) => {
+  if (!isStaff(user)) {
+    const student = await getStudentProfile(prisma, user.id);
+    const assignment = await getUnlockedAssignment(prisma, student.id, id);
+    const progress = await prisma.submissionProgress.findUnique({
+      where: { studentId_assignmentId: { studentId: student.id, assignmentId: id } },
+      select: { state: true },
+    });
+    return { ...assignment, isLocked: false, progressState: progress?.state ?? null };
+  }
   try {
     return await prisma.assignment.findUniqueOrThrow({ where: { id } });
   } catch (error) {

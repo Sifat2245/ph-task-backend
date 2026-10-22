@@ -5,11 +5,14 @@ import { routerIndex } from "./app/router";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { notFound } from "./app/middleware/notFound";
 import cookieParser from "cookie-parser";
+import status from "http-status";
+import { sendResponse } from "./app/shared/sendResponse";
 
 const app: Application = express();
 
 app.post("/api/auth/sign-up/email", (_req: Request, res: Response) => {
-  res.status(400).json({
+  sendResponse(res, {
+    statusCode: status.BAD_REQUEST,
     success: false,
     message: "Register through POST /api/v1/auth/signup.",
   });

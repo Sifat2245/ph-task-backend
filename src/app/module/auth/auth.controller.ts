@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import status from "http-status";
 import { fromNodeHeaders } from "better-auth/node";
 import { CatchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
@@ -23,7 +24,7 @@ const createStudent = CatchAsync(async (req: Request, res: Response) => {
   }
 
   sendResponse(res, {
-    statusCode: 201,
+    statusCode: status.CREATED,
     success: true,
     message: "Student created successfully",
     data: { token, accessToken, refreshToken, ...rest },
@@ -46,7 +47,7 @@ const signIn = CatchAsync(async (req: Request, res: Response) => {
   }
 
   sendResponse(res, {
-    statusCode: 200,
+    statusCode: status.OK,
     success: true,
     message: "Signed in successfully",
     data: { token, accessToken, refreshToken, ...rest },
@@ -65,7 +66,7 @@ const logout = CatchAsync(async (req: Request, res: Response) => {
   }
 
   sendResponse(res, {
-    statusCode: 200,
+    statusCode: status.OK,
     success: true,
     message: "Logged out successfully",
     data: result.data,

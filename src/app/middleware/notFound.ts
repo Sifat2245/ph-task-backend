@@ -1,9 +1,11 @@
-import { Request, Response } from "express";
+import type { RequestHandler } from "express";
 import status from "http-status";
+import { sendResponse } from "../shared/sendResponse";
 
-export const notFound = (req: Request, res: Response) => {
-    res.status(status.NOT_FOUND).json({
-        success: false,
-        message: "route not found"
-    })
-}
+export const notFound: RequestHandler = (_req, res) => {
+  sendResponse(res, {
+    statusCode: status.NOT_FOUND,
+    success: false,
+    message: "Route not found.",
+  });
+};

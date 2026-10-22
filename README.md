@@ -208,7 +208,68 @@ timestamp. `[submissionId, version]` is unique; subsequent revisions must
 explicitly supply the next version number. `AssignmentSubmission.revisions`
 provides the reverse relation, and referenced submissions cannot be deleted.
 Creating a submission or skip does not automatically update progress or create
-a revision; those records must be written together by the submission workflow.
+a revision at the schema level. The student submission and skip services write
+the corresponding records and progress together in a Prisma transaction.
+
+Student assignment access follows ascending `assignmentNumber`, including gaps
+between numbers. The first assignment is unlocked. Every earlier assignment
+must have `SUBMITTED` or `SKIPPED` progress before a student can read, submit,
+or skip a later assignment. Mentor review is not required to unlock the next
+assignment. Progress belongs to the authenticated student's `Student` profile;
+clients cannot supply a student ID, progress state, revision version, or review
+status. Missing student profiles return `403`.
+
+Both student modules follow the route/controller/service/validation structure:
+
+| Method | Endpoint | Required body |
+| --- | --- | --- |
+| POST | `/api/v1/assignment-submission/submit-assignment` | `assignmentId`, `submissionItems`, `note` |
+| POST | `/api/v1/submission-skip/skip-assignment` | `assignmentId`, `reason` |
+
+For example, submit the first assignment after signing in as a student:
+
+```json
+{
+  "assignmentId": "ASSIGNMENT_UUID",
+  "submissionItems": "https://github.com/example/portfolio",
+  "note": "Deployed portfolio and source code."
+}
+```
+
+Or skip it:
+
+```json
+{
+  "assignmentId": "ASSIGNMENT_UUID",
+  "reason": "I need more time to practice this topic."
+}
+```
+
+Use the assignment UUID from the assignment list. Submission items, notes,
+and skip reasons are required non-whitespace strings. Unknown fields are
+rejected. Both routes require the `STUDENT` role and return `201` on success.
+Submitting returns `submission`, `revision`, `progress`, and `nextAssignment`;
+skipping returns `skip`, `progress`, and `nextAssignment`. `nextAssignment`
+contains the next assignment's ID, number, and title, or `null` after the last
+assignment.
+
+Submitting creates a submission with a numbered revision and `SUBMITTED`
+progress. Submitting again adds the next revision to the same submission and
+sets its review status back to `PENDING`, preserving previous revisions and
+reviews. A skipped assignment can be submitted later; its skip record remains
+as history and progress becomes `SUBMITTED`. Submitted assignments cannot be
+skipped, and repeating a skip returns `409`. Student progress writes acquire
+a lock on that student's profile row so simultaneous requests cannot duplicate
+submissions, skip records, or revision numbers through these services.
+
+For students, `GET /api/v1/assignment/get-all-assignments` now includes
+`isLocked` and `progressState` (`SUBMITTED`, `SKIPPED`, or `null`) on each item.
+Locked items retain their title, number, and grading metadata, but their
+`description` is `null`. The single-assignment route returns `403` for locked
+assignments. Submission and skip routes enforce the same restriction, including
+requests made directly without the frontend. Invalid payloads return `400`;
+unknown assignment UUIDs return `404`. Admins and mentors keep full read access
+to assignments and cannot use the student submission/skip routes.
 
 `AssignmentReview` maps to `review` and stores `revisionId`, `mentorId`, integer
 `marks`, required `examineFeedback`, and an automatic `reviewedAt` timestamp.

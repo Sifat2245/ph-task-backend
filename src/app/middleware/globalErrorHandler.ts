@@ -1,20 +1,41 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { NextFunction, Request, Response } from "express";
-import { envVariables } from "../../config/env";
+import type { ErrorRequestHandler } from "express";
+import { isAPIError } from "better-auth/api";
 import status from "http-status";
+import { envVariables } from "../../config/env";
+import { sendResponse } from "../shared/sendResponse";
 
-export const globalErrorHandler = (err: any, req: Request, res: Response, next: NextFunction) =>{
-    if (envVariables.NODE_ENV ==="development"){
-        console.log(err)
-    }
+export const globalErrorHandler: ErrorRequestHandler = (
+  error: unknown,
+  _req,
+  res,
+  next,
+) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
 
-    const statusCode: number = status.INTERNAL_SERVER_ERROR;
-    const message: string = 'internal server error'
+  let statusCode: number = status.INTERNAL_SERVER_ERROR;
+  let message = "Internal server error.";
+  const errorType =
+    error && typeof error === "object" && "type" in error
+      ? error.type
+      : undefined;
 
-    res.status(statusCode).json({
-        success: true,
-        message: message,
-        error: err.message
-    })
-}
+  if (isAPIError(error)) {
+    statusCode = error.statusCode;
+    message = error.message;
+  } else if (errorType === "entity.parse.failed") {
+    statusCode = status.BAD_REQUEST;
+    message = "Request body must be a valid JSON object.";
+  } else if (errorType === "entity.too.large") {
+    statusCode = status.REQUEST_ENTITY_TOO_LARGE;
+    message = "Request body is too large.";
+  }
+
+  if (envVariables.NODE_ENV === "development") {
+    console.error(error);
+  }
+
+  sendResponse(res, { statusCode, success: false, message });
+};
