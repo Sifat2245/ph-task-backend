@@ -3,3 +3,13 @@ enum UserRole {
   MENTOR
   STUDENT
 }
+
+enum SubmissionStatus {
+  PENDING
+  REVIEWED
+}
+
+enum SubmissionProgressState {
+  SUBMITTED
+  SKIPPED
+}

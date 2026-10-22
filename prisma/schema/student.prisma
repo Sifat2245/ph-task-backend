@@ -1,9 +1,12 @@
 model Student {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String                 @id @default(uuid())
+  userId             String                 @unique
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  submissions        AssignmentSubmission[]
+  submissionSkips    SubmissionSkip[]
+  submissionProgress SubmissionProgress[]
 
   @@map("student")
 }

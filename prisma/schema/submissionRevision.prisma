@@ -1,0 +1,13 @@
+model SubmissionRevision {
+  id              String               @id @default(uuid())
+  submissionId    String
+  version         Int                  @default(1)
+  submissionItems String               @map("submission_items")
+  note            String
+  submittedAt     DateTime             @default(now())
+  submission      AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  reviews         AssignmentReview[]
+
+  @@unique([submissionId, version])
+  @@map("submission_revision")
+}

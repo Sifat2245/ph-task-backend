@@ -1,0 +1,14 @@
+model AssignmentReview {
+  id              String             @id @default(uuid())
+  revisionId      String
+  mentorId        String
+  marks           Int
+  examineFeedback String
+  reviewedAt      DateTime           @default(now())
+  revision        SubmissionRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  mentor          User               @relation("MentorReviews", fields: [mentorId], references: [id], onDelete: Restrict)
+
+  @@index([revisionId])
+  @@index([mentorId])
+  @@map("review")
+}

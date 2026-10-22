@@ -20,6 +20,14 @@ const rethrowAssignmentError = (error: unknown): never => {
       notFound.cause = error;
       throw notFound;
     }
+
+    if (error.code === "P2003") {
+      const conflict = new APIError("CONFLICT", {
+        message: "Assignment cannot be deleted while it has submission, skip, or progress records.",
+      });
+      conflict.cause = error;
+      throw conflict;
+    }
   }
   throw error;
 };

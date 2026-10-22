@@ -136,6 +136,16 @@ const deleteUser = async (id: string) => {
       return tx.user.delete({ where: { id, role: UserRole.MENTOR } });
     });
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2003"
+    ) {
+      const conflict = new APIError("CONFLICT", {
+        message: "Mentor cannot be deleted while they have assignment review records.",
+      });
+      conflict.cause = error;
+      throw conflict;
+    }
     rethrowUserError(error);
   }
 };

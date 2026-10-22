@@ -1,0 +1,13 @@
+model SubmissionProgress {
+  id           String                  @id @default(uuid())
+  studentId    String
+  assignmentId String
+  state        SubmissionProgressState
+  updatedAt    DateTime                @updatedAt
+  student      Student                 @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  assignment   Assignment              @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, assignmentId])
+  @@index([assignmentId])
+  @@map("assignment_submission_progress")
+}

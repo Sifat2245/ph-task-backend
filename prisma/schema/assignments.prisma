@@ -1,10 +1,13 @@
 model Assignment {
-  id               String   @id @default(uuid())
-  assignmentNumber Int      @unique
-  title            String
-  description      String   @db.Text
-  maxMarks         Int
-  createdAt        DateTime @default(now())
+  id                 String                 @id @default(uuid())
+  assignmentNumber   Int                    @unique
+  title              String
+  description        String                 @db.Text
+  maxMarks           Int
+  createdAt          DateTime               @default(now())
+  submissions        AssignmentSubmission[]
+  submissionSkips    SubmissionSkip[]
+  submissionProgress SubmissionProgress[]
 
   @@map("assignment")
 }

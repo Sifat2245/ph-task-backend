@@ -1,0 +1,13 @@
+model SubmissionSkip {
+  id           String     @id @default(uuid())
+  studentId    String
+  assignmentId String
+  reason       String
+  skippedAt    DateTime   @default(now())
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@index([studentId, assignmentId])
+  @@index([assignmentId])
+  @@map("assignment_skip")
+}
