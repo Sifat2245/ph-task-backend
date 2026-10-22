@@ -11,6 +11,7 @@ interface EnvConfig {
   BETTER_AUTH_SECRET: string;
   SEED_ADMIN_PASSWORD: string;
   SEED_MENTOR_PASSWORD: string;
+  SEED_STUDENT_PASSWORD: string;
 }
 
 const localEnvVariables = (): EnvConfig => {
@@ -38,6 +39,7 @@ const localEnvVariables = (): EnvConfig => {
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET as string,
     SEED_ADMIN_PASSWORD: process.env.SEED_ADMIN_PASSWORD || "Admin123!",
     SEED_MENTOR_PASSWORD: process.env.SEED_MENTOR_PASSWORD || "Mentor123!",
+    SEED_STUDENT_PASSWORD: process.env.SEED_STUDENT_PASSWORD || "Student123!",
   };
 };
 

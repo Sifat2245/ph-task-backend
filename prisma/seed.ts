@@ -1,6 +1,7 @@
 import { UserRole } from "../src/generated/prisma/enums";
 import { auth } from "../src/app/lib/auth";
 import { prisma } from "../src/app/lib/prisma";
+import { AuthService } from "../src/app/module/auth/auth.service";
 import { envVariables } from "../src/config/env";
 import { assignments } from "./seed-data";
 
@@ -8,7 +9,7 @@ type SeedAccount = {
   name: string;
   email: string;
   password: string;
-  role: "ADMIN" | "MENTOR";
+  role: UserRole;
   createdById?: string;
 };
 
@@ -37,17 +38,32 @@ const seedAccount = async (account: SeedAccount) => {
       throw new Error(`Existing seed account ${account.email} has no password.`);
     }
 
+    if (account.role === UserRole.STUDENT) {
+      const student = await prisma.student.findUnique({
+        where: { userId: existingUser.id },
+      });
+
+      if (!existingUser.studentId || !student) {
+        throw new Error(
+          `Existing seed student ${account.email} is missing a student ID or profile.`,
+        );
+      }
+    }
+
     console.log(`Kept existing ${account.role}: ${account.email}`);
     return existingUser;
   }
 
-  const { user: registeredUser } = await auth.api.signUpEmail({
-    body: {
-      name: account.name,
-      email: account.email,
-      password: account.password,
-    },
-  });
+  const payload = {
+    name: account.name,
+    email: account.email,
+    password: account.password,
+  };
+
+  const registeredUser =
+    account.role === UserRole.STUDENT
+      ? (await AuthService.createStudent(payload)).data.user
+      : (await auth.api.signUpEmail({ body: payload })).user;
 
   try {
     const user = await prisma.$transaction(async (tx) => {
@@ -55,7 +71,8 @@ const seedAccount = async (account: SeedAccount) => {
         where: { id: registeredUser.id },
         data: {
           role: account.role,
-          studentId: null,
+          studentId:
+            account.role === UserRole.STUDENT ? registeredUser.studentId : null,
           createdById: account.createdById ?? null,
         },
       });
@@ -101,6 +118,16 @@ const main = async () => {
     });
   }
 
+  for (let index = 1; index <= 10; index++) {
+    await seedAccount({
+      name: `Student ${index}`,
+      email: `student${index}@example.com`,
+      password: envVariables.SEED_STUDENT_PASSWORD,
+      role: UserRole.STUDENT,
+      createdById: admin.id,
+    });
+  }
+
   await prisma.$transaction(
     assignments.map((assignment) =>
       prisma.assignment.upsert({
@@ -111,7 +138,7 @@ const main = async () => {
     ),
   );
 
-  console.log("Seed complete: 5 assignments, 1 admin, and 5 mentors.");
+  console.log("Seed complete: 5 assignments, 1 admin, 5 mentors, and 10 students.");
 };
 
 main()

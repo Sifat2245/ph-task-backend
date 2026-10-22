@@ -39,7 +39,7 @@ npx prisma migrate dev --name init
 npx prisma generate
 ```
 
-Seed the five assignments, one admin, and five mentors:
+Seed the five assignments, one admin, five mentors, and ten students:
 
 ```sh
 npm run seed
@@ -51,16 +51,21 @@ New development seed accounts use these credentials by default:
 | --- | --- | --- |
 | Admin | `admin@example.com` | `Admin123!` |
 | Mentor | `mentor1@example.com` through `mentor5@example.com` | `Mentor123!` |
+| Student | `student1@example.com` through `student10@example.com` | `Student123!` |
 
-Set `SEED_ADMIN_PASSWORD` and `SEED_MENTOR_PASSWORD` in `.env` before seeding to
-choose different passwords for new accounts. The seed uses Better Auth sign-up
+Set `SEED_ADMIN_PASSWORD`, `SEED_MENTOR_PASSWORD`, and `SEED_STUDENT_PASSWORD`
+in `.env` before seeding to choose different passwords for new accounts.
+The seed uses Better Auth sign-up
 to create credential accounts, assigns the requested roles, and records the admin
 as each new mentor's creator. It removes the sessions created during seeding.
 Admin and mentor accounts have a null student ID and no `Student` profile.
+Students use `AuthService.createStudent` to receive a unique student ID and a
+linked `Student` profile. New students also reference the admin as their creator.
 
 Rerunning the seed updates assignments by their unique assignment number and
-keeps existing account IDs, passwords, and sessions. It stops if a seed email
-belongs to a different role or has no credential password. The assignment data
+keeps existing account IDs, student IDs, profiles, passwords, and sessions. It
+stops if a seed email belongs to a different role, has no credential password,
+or is a student missing its student ID or profile. The assignment data
 is stored in `prisma/seed-data.ts` and the script in `prisma/seed.ts`.
 
 Available endpoints:
