@@ -61,9 +61,15 @@ Generate a random secret with Node.js; run this separately for each secret:
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-Configuration is loaded and validated by [src/config/env.ts](src/config/env.ts).
+Application configuration is loaded and validated by [src/config/env.ts](src/config/env.ts).
 The `.env` file is ignored by Git; [.env.example](.env.example) documents the
 available settings.
+
+The Prisma CLI loads `.env` separately through [prisma.config.ts](prisma.config.ts)
+and reads only `DIRECT_URL`. Client generation and compilation can run without
+application environment variables; database commands still require `DIRECT_URL`.
+For Vercel, add the required runtime variables in the project's **Settings →
+Environment Variables**, including `NODE_ENV=production`, before deploying.
 
 ### 2. Install dependencies and prepare the database
 

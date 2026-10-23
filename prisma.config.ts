@@ -1,5 +1,5 @@
+import "dotenv/config";
 import { defineConfig } from "prisma/config";
-import { envVariables } from "./src/config/env";
 
 export default defineConfig({
   schema: "prisma/schema",
@@ -8,6 +8,7 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: envVariables.DIRECT_URL,
+    // Client generation can run without a database URL or application secrets.
+    url: process.env.DIRECT_URL,
   },
 });
