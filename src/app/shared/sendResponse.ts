@@ -1,5 +1,5 @@
 import type { Response } from "express";
-import type { PaginationMeta } from "../utils/pagination";
+import type { PaginationMeta } from "../utils/pagination.js";
 
 interface IResponse<T> {
   statusCode: number;

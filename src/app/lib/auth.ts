@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { envVariables } from "../../config/env";
-import { UserRole } from "../../generated/prisma/enums";
-import { prisma } from "./prisma";
+import { envVariables } from "../../config/env.js";
+import { UserRole } from "../../generated/prisma/enums.js";
+import { prisma } from "./prisma.js";
 import ms from "ms";
-import { authCookieOptions } from "../../config/cookie";
+import { authCookieOptions } from "../../config/cookie.js";
 
 export const auth = betterAuth({
   baseURL: envVariables.BETTER_AUTH_URL,

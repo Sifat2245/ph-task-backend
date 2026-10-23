@@ -1,13 +1,13 @@
 import { APIError } from "better-auth/api";
-import { SubmissionProgressState } from "../../../generated/prisma/enums";
-import { prisma } from "../../lib/prisma";
+import { SubmissionProgressState } from "../../../generated/prisma/enums.js";
+import { prisma } from "../../lib/prisma.js";
 import {
   getNextAssignment,
   getStudentProfile,
   getUnlockedAssignment,
   withStudentTransaction,
-} from "../assignment/assignment.access";
-import { parseSkipAssignment } from "./submissionSkip.validation";
+} from "../assignment/assignment.access.js";
+import { parseSkipAssignment } from "./submissionSkip.validation.js";
 
 const skipAssignment = async (userId: string, payload: unknown) => {
   const data = parseSkipAssignment(payload);

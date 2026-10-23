@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
 import status from "http-status";
 import { fromNodeHeaders } from "better-auth/node";
-import { CatchAsync } from "../../shared/catchAsync";
-import { sendResponse } from "../../shared/sendResponse";
-import { AuthService } from "./auth.service";
-import { tokenUtils } from "../../utils/token";
-import { cookieUtils } from "../../utils/cookie";
+import { CatchAsync } from "../../shared/catchAsync.js";
+import { sendResponse } from "../../shared/sendResponse.js";
+import { AuthService } from "./auth.service.js";
+import { tokenUtils } from "../../utils/token.js";
+import { cookieUtils } from "../../utils/cookie.js";
 
 const createStudent = CatchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.createStudent(

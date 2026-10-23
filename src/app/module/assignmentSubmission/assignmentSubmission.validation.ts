@@ -1,5 +1,5 @@
 import { APIError } from "better-auth/api";
-import { parseAssignmentId } from "../assignment/assignment.validation";
+import { parseAssignmentId } from "../assignment/assignment.validation.js";
 
 export const parseSubmitAssignment = (payload: unknown) => {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {

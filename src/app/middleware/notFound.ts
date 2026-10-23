@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import status from "http-status";
-import { sendResponse } from "../shared/sendResponse";
+import { sendResponse } from "../shared/sendResponse.js";
 
 export const notFound: RequestHandler = (_req, res) => {
   sendResponse(res, {

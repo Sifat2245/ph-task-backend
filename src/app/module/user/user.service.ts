@@ -1,8 +1,8 @@
 import { APIError } from "better-auth/api";
-import { Prisma, UserRole } from "../../../generated/prisma/client";
-import { auth } from "../../lib/auth";
-import { prisma } from "../../lib/prisma";
-import { parseCreateMentor, parseUpdateMentor } from "./user.validation";
+import { Prisma, UserRole } from "../../../generated/prisma/client.js";
+import { auth } from "../../lib/auth.js";
+import { prisma } from "../../lib/prisma.js";
+import { parseCreateMentor, parseUpdateMentor } from "./user.validation.js";
 
 const rethrowUserError = (error: unknown): never => {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {

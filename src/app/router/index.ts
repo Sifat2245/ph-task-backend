@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { userRoutes } from "../module/user/user.routes";
-import { authRoutes } from "../module/auth/auth.route";
-import { assignmentRoutes } from "../module/assignment/assignment.routes";
-import { assignmentSubmissionRoutes } from "../module/assignmentSubmission/assignmentSubmission.routes";
-import { submissionSkipRoutes } from "../module/submissionSkip/submissionSkip.routes";
-import { assignmentReviewRoutes } from "../module/assignmentReview/assignmentReview.routes";
-import { studentRoutes } from "../module/student/student.routes";
+import { userRoutes } from "../module/user/user.routes.js";
+import { authRoutes } from "../module/auth/auth.route.js";
+import { assignmentRoutes } from "../module/assignment/assignment.routes.js";
+import { assignmentSubmissionRoutes } from "../module/assignmentSubmission/assignmentSubmission.routes.js";
+import { submissionSkipRoutes } from "../module/submissionSkip/submissionSkip.routes.js";
+import { assignmentReviewRoutes } from "../module/assignmentReview/assignmentReview.routes.js";
+import { studentRoutes } from "../module/student/student.routes.js";
 
 const router = Router();
 

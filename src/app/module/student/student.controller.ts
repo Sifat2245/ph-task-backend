@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
 import status from "http-status";
-import { CatchAsync } from "../../shared/catchAsync";
-import { sendResponse } from "../../shared/sendResponse";
-import { StudentService } from "./student.service";
-import { parseStudentId } from "./student.validation";
+import { CatchAsync } from "../../shared/catchAsync.js";
+import { sendResponse } from "../../shared/sendResponse.js";
+import { StudentService } from "./student.service.js";
+import { parseStudentId } from "./student.validation.js";
 
 const getAllStudents = CatchAsync(async (req: Request, res: Response) => {
   const result = await StudentService.getAllStudents(req.query);

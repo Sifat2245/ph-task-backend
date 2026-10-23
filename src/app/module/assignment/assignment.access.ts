@@ -1,6 +1,6 @@
 import { APIError } from "better-auth/api";
-import type { Prisma } from "../../../generated/prisma/client";
-import { prisma } from "../../lib/prisma";
+import type { Prisma } from "../../../generated/prisma/client.js";
+import { prisma } from "../../lib/prisma.js";
 
 export const getStudentProfile = async (
   db: Prisma.TransactionClient,

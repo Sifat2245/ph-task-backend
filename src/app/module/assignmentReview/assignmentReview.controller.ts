@@ -1,10 +1,10 @@
 import type { Request, Response } from "express";
 import status from "http-status";
-import { getAuthSession } from "../../middleware/checkAuth";
-import { CatchAsync } from "../../shared/catchAsync";
-import { sendResponse } from "../../shared/sendResponse";
-import { AssignmentReviewService } from "./assignmentReview.service";
-import { parseReviewId, parseSubmissionId } from "./assignmentReview.validation";
+import { getAuthSession } from "../../middleware/checkAuth.js";
+import { CatchAsync } from "../../shared/catchAsync.js";
+import { sendResponse } from "../../shared/sendResponse.js";
+import { AssignmentReviewService } from "./assignmentReview.service.js";
+import { parseReviewId, parseSubmissionId } from "./assignmentReview.validation.js";
 
 const createReview = CatchAsync(async (req: Request, res: Response) => {
   const result = await AssignmentReviewService.createReview(

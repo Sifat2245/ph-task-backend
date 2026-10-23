@@ -1,13 +1,13 @@
 import express, { Application, Request, Response } from "express";
 import { toNodeHandler } from "better-auth/node";
-import { auth } from "./app/lib/auth";
-import { routerIndex } from "./app/router";
-import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
-import { notFound } from "./app/middleware/notFound";
+import { auth } from "./app/lib/auth.js";
+import { routerIndex } from "./app/router/index.js";
+import { globalErrorHandler } from "./app/middleware/globalErrorHandler.js";
+import { notFound } from "./app/middleware/notFound.js";
 import cookieParser from "cookie-parser";
 import status from "http-status";
-import { sendResponse } from "./app/shared/sendResponse";
-import { corsMiddleware } from "./app/middleware/cors";
+import { sendResponse } from "./app/shared/sendResponse.js";
+import { corsMiddleware } from "./app/middleware/cors.js";
 
 const app: Application = express();
 

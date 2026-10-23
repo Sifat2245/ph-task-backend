@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { APIError } from "better-auth/api";
-import { envVariables } from "../../config/env";
+import { envVariables } from "../../config/env.js";
 
 const allowedOrigins = new Set([
   envVariables.FRONTEND_URL,

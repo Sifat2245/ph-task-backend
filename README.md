@@ -105,9 +105,11 @@ npm run build
 npm start
 ```
 
-The compiled entry point is `dist/src/server.js`. The start command uses the
-installed `tsx` loader to resolve the project's extensionless ESM imports;
-`tsx` must remain available in the runtime installation.
+The compiled entry point is `dist/src/server.js` and runs directly with Node.js.
+Local imports use explicit `.js` extensions, including Prisma's generated
+imports, so the compiled ESM also works in Vercel's Node.js runtime. TypeScript's
+`NodeNext` configuration checks these imports during compilation. Development
+and seeding still use `tsx` to run the TypeScript source files.
 
 ## Environment variables
 

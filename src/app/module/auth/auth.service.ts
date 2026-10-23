@@ -1,9 +1,9 @@
 import { APIError } from "better-auth/api";
-import type { User } from "../../../generated/prisma/client";
-import { UserRole } from "../../../generated/prisma/enums";
-import { auth } from "../../lib/auth";
-import { prisma } from "../../lib/prisma";
-import { tokenUtils } from "../../utils/token";
+import type { User } from "../../../generated/prisma/client.js";
+import { UserRole } from "../../../generated/prisma/enums.js";
+import { auth } from "../../lib/auth.js";
+import { prisma } from "../../lib/prisma.js";
+import { tokenUtils } from "../../utils/token.js";
 
 type CreateStudentInput = {
   name: string;

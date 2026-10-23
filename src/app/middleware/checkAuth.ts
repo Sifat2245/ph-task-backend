@@ -1,13 +1,13 @@
 import type { Response } from "express";
 import { APIError } from "better-auth/api";
 import { fromNodeHeaders } from "better-auth/node";
-import { envVariables } from "../../config/env";
-import type { UserRole } from "../../generated/prisma/enums";
-import { auth } from "../lib/auth";
-import { prisma } from "../lib/prisma";
-import { CatchAsync } from "../shared/catchAsync";
-import { cookieUtils } from "../utils/cookie";
-import { jwtUtils } from "../utils/jwt";
+import { envVariables } from "../../config/env.js";
+import type { UserRole } from "../../generated/prisma/enums.js";
+import { auth } from "../lib/auth.js";
+import { prisma } from "../lib/prisma.js";
+import { CatchAsync } from "../shared/catchAsync.js";
+import { cookieUtils } from "../utils/cookie.js";
+import { jwtUtils } from "../utils/jwt.js";
 
 type AuthSession = typeof auth.$Infer.Session;
 

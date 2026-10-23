@@ -1,9 +1,9 @@
 import { APIError } from "better-auth/api";
-import { Prisma } from "../../../generated/prisma/client";
-import { UserRole } from "../../../generated/prisma/enums";
-import { prisma } from "../../lib/prisma";
-import { parseCreateAssignment, parseUpdateAssignment } from "./assignment.validation";
-import { getStudentProfile, getUnlockedAssignment } from "./assignment.access";
+import { Prisma } from "../../../generated/prisma/client.js";
+import { UserRole } from "../../../generated/prisma/enums.js";
+import { prisma } from "../../lib/prisma.js";
+import { parseCreateAssignment, parseUpdateAssignment } from "./assignment.validation.js";
+import { getStudentProfile, getUnlockedAssignment } from "./assignment.access.js";
 
 type AssignmentViewer = { id: string; role?: UserRole | null };
 

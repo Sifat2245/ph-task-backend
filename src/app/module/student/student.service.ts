@@ -1,8 +1,8 @@
 import { APIError } from "better-auth/api";
-import type { Prisma } from "../../../generated/prisma/client";
-import { UserRole } from "../../../generated/prisma/enums";
-import { prisma } from "../../lib/prisma";
-import { paginationUtils } from "../../utils/pagination";
+import type { Prisma } from "../../../generated/prisma/client.js";
+import { UserRole } from "../../../generated/prisma/enums.js";
+import { prisma } from "../../lib/prisma.js";
+import { paginationUtils } from "../../utils/pagination.js";
 
 const studentSelect = {
   id: true,

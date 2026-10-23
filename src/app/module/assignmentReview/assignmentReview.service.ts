@@ -1,13 +1,13 @@
 import { APIError } from "better-auth/api";
-import type { Prisma } from "../../../generated/prisma/client";
-import { SubmissionStatus } from "../../../generated/prisma/enums";
-import { prisma } from "../../lib/prisma";
-import { paginationUtils } from "../../utils/pagination";
-import { withStudentTransaction } from "../assignment/assignment.access";
+import type { Prisma } from "../../../generated/prisma/client.js";
+import { SubmissionStatus } from "../../../generated/prisma/enums.js";
+import { prisma } from "../../lib/prisma.js";
+import { paginationUtils } from "../../utils/pagination.js";
+import { withStudentTransaction } from "../assignment/assignment.access.js";
 import {
   parseCreateReview,
   parseUpdateReview,
-} from "./assignmentReview.validation";
+} from "./assignmentReview.validation.js";
 
 const submissionContext = {
   assignment: {

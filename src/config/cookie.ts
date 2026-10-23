@@ -1,4 +1,4 @@
-import { envVariables } from "./env";
+import { envVariables } from "./env.js";
 
 const isProduction = envVariables.NODE_ENV === "production";
 

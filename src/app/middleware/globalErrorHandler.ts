@@ -1,8 +1,8 @@
 import type { ErrorRequestHandler } from "express";
 import { isAPIError } from "better-auth/api";
 import status from "http-status";
-import { envVariables } from "../../config/env";
-import { sendResponse } from "../shared/sendResponse";
+import { envVariables } from "../../config/env.js";
+import { sendResponse } from "../shared/sendResponse.js";
 
 export const globalErrorHandler: ErrorRequestHandler = (
   error: unknown,

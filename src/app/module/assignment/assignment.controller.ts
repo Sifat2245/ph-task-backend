@@ -1,10 +1,10 @@
 import type { Request, Response } from "express";
 import status from "http-status";
-import { CatchAsync } from "../../shared/catchAsync";
-import { sendResponse } from "../../shared/sendResponse";
-import { AssignmentService } from "./assignment.service";
-import { parseAssignmentId } from "./assignment.validation";
-import { getAuthSession } from "../../middleware/checkAuth";
+import { CatchAsync } from "../../shared/catchAsync.js";
+import { sendResponse } from "../../shared/sendResponse.js";
+import { AssignmentService } from "./assignment.service.js";
+import { parseAssignmentId } from "./assignment.validation.js";
+import { getAuthSession } from "../../middleware/checkAuth.js";
 
 const createAssignment = CatchAsync(async (req: Request, res: Response) => {
   const result = await AssignmentService.createAssignment(req.body);

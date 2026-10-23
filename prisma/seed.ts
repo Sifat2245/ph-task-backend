@@ -1,9 +1,9 @@
-import { UserRole } from "../src/generated/prisma/enums";
-import { auth } from "../src/app/lib/auth";
-import { prisma } from "../src/app/lib/prisma";
-import { AuthService } from "../src/app/module/auth/auth.service";
-import { envVariables } from "../src/config/env";
-import { assignments } from "./seed-data";
+import { UserRole } from "../src/generated/prisma/enums.js";
+import { auth } from "../src/app/lib/auth.js";
+import { prisma } from "../src/app/lib/prisma.js";
+import { AuthService } from "../src/app/module/auth/auth.service.js";
+import { envVariables } from "../src/config/env.js";
+import { assignments } from "./seed-data.js";
 
 type SeedAccount = {
   name: string;

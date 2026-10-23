@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
 import status from "http-status";
 import { fromNodeHeaders } from "better-auth/node";
-import { CatchAsync } from "../../shared/catchAsync";
-import { UserService } from "./user.service";
-import { sendResponse } from "../../shared/sendResponse";
-import { getAuthSession } from "../../middleware/checkAuth";
-import { parseMentorId } from "./user.validation";
+import { CatchAsync } from "../../shared/catchAsync.js";
+import { UserService } from "./user.service.js";
+import { sendResponse } from "../../shared/sendResponse.js";
+import { getAuthSession } from "../../middleware/checkAuth.js";
+import { parseMentorId } from "./user.validation.js";
 
 const createUser = CatchAsync(async (req: Request, res: Response) => {
   const payload = req.body;

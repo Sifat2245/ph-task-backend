@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { UserRole } from "../../../generated/prisma/enums";
-import { checkAuth } from "../../middleware/checkAuth";
-import { AssignmentController } from "./assignment.controller";
+import { UserRole } from "../../../generated/prisma/enums.js";
+import { checkAuth } from "../../middleware/checkAuth.js";
+import { AssignmentController } from "./assignment.controller.js";
 
 export const assignmentRoutes = Router();
 

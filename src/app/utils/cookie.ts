@@ -1,6 +1,6 @@
 import type { CookieOptions, Request, Response } from "express";
 import { parseCookies } from "better-auth/cookies";
-import { authCookieOptions } from "../../config/cookie";
+import { authCookieOptions } from "../../config/cookie.js";
 
 const defaultCookieOptions: CookieOptions = authCookieOptions;
 

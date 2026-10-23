@@ -2,15 +2,15 @@ import { APIError } from "better-auth/api";
 import {
   SubmissionProgressState,
   SubmissionStatus,
-} from "../../../generated/prisma/enums";
-import { prisma } from "../../lib/prisma";
+} from "../../../generated/prisma/enums.js";
+import { prisma } from "../../lib/prisma.js";
 import {
   getNextAssignment,
   getStudentProfile,
   getUnlockedAssignment,
   withStudentTransaction,
-} from "../assignment/assignment.access";
-import { parseSubmitAssignment } from "./assignmentSubmission.validation";
+} from "../assignment/assignment.access.js";
+import { parseSubmitAssignment } from "./assignmentSubmission.validation.js";
 
 const submitAssignment = async (userId: string, payload: unknown) => {
   const data = parseSubmitAssignment(payload);
