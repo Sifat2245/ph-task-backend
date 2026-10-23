@@ -23,6 +23,7 @@
     "better-auth"
   ],
   "type": "module",
+  "postinstall": "prisma generate",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/cookie-parser": "^1.4.10",
