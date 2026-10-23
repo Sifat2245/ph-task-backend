@@ -292,10 +292,75 @@ The reverse relations are `SubmissionRevision.reviews` and
 per revision are allowed. Referenced revisions and mentors cannot be deleted;
 the mentor deletion endpoint returns `409` when review records exist.
 
-The review API must authorize `MENTOR` users, take the mentor ID from the
-authenticated session, and validate marks against the assignment's maximum.
-The foreign key verifies that the reviewer exists; role permissions and marks
-validation must be implemented in the review service.
+The assignment review module authorizes `MENTOR` and `ADMIN` users. The existing
+`mentorId` field stores the signed-in reviewer's `User.id` for either role;
+clients cannot supply or change it. Reviewers can view and edit their own
+reviews. Editing another reviewer's review returns `404`, including for admins.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/api/v1/assignment-review/get-all-submissions` | View submitted assignments with their latest revision |
+| GET | `/api/v1/assignment-review/get-single-submission/:id` | View one submission and its revision history |
+| POST | `/api/v1/assignment-review/create-review` | Submit a review for a revision |
+| GET | `/api/v1/assignment-review/get-my-reviews` | View all your reviews |
+| GET | `/api/v1/assignment-review/get-my-review/:id` | View one of your reviews |
+| PUT | `/api/v1/assignment-review/update-review/:id` | Edit marks or feedback on your review |
+
+The submission list excludes skips and submission records without revisions.
+Its entries contain the assignment, student name/public student ID, latest
+revision, and the signed-in reviewer's reviews. The single-submission route
+includes all revisions, newest first, with that reviewer's reviews. Use the
+submission UUID for `get-single-submission/:id` and the revision UUID from its
+`revisions` array when creating a review:
+
+```json
+{
+  "revisionId": "REVISION_UUID",
+  "marks": 45,
+  "examineFeedback": "Good implementation. Improve form accessibility."
+}
+```
+
+Marks must be integers from `0` to the assignment's `maxMarks`, inclusive.
+Feedback is required and trimmed. Extra fields are rejected. Each reviewer can
+submit one review per revision through the service; duplicates return `409` and
+must be edited through the update route. Different reviewers can review the
+same revision. Creation returns `201`; reads and edits return `200`, all using
+the shared `statusCode`, `success`, `message`, and `data` response structure.
+
+Use a review UUID for the single-review and update routes. Updates accept
+`marks`, `examineFeedback`, or both; an empty update is rejected. Saving an edit
+refreshes `reviewedAt`. Review IDs, reviewer IDs, and revision IDs cannot be
+changed. An empty review list returns `[]`; missing reviews/submissions return
+`404`, and invalid IDs or payloads return `400`.
+
+Review saves and changes to the submission's `REVIEWED` status happen in one
+transaction. A review marks the submission `REVIEWED` only when it targets the
+latest revision. Older revision reviews remain editable without marking a newer
+revision reviewed. New student revisions return the submission to `PENDING`,
+preserving earlier reviews. Review writes share the student's profile lock with
+submission writes, protecting duplicate-review checks and status changes during
+simultaneous requests. Reviews do not change the student's assignment progress.
+
+The student module lets admins and mentors read student profiles:
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/api/v1/student/get-all-students` | List student profiles, newest first |
+| GET | `/api/v1/student/get-single-student/:id` | View one student profile |
+
+Use `id` from the list response for `:id`. This is the `Student.id` profile UUID.
+Each record also includes `userId` and a nested `user` with the user's ID, public
+student code (`studentId`, such as `STU-001`), name, email, image, role, and
+timestamps. Only profiles whose user currently has the `STUDENT` role are
+returned. Accounts, passwords, session tokens, and other authentication details
+are excluded.
+
+Both routes require `ADMIN` or `MENTOR` login cookies and return `200` with the
+shared response structure. An empty list returns `data: []`. Invalid profile
+UUIDs return `400`; missing profiles or profiles belonging to non-students return
+`404`. Requests from students return `403`, and unauthenticated requests return
+`401`.
 
 For example, after signing in as the admin and saving cookies to `cookies.txt`:
 

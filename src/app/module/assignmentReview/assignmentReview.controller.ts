@@ -1,0 +1,89 @@
+import type { Request, Response } from "express";
+import status from "http-status";
+import { getAuthSession } from "../../middleware/checkAuth";
+import { CatchAsync } from "../../shared/catchAsync";
+import { sendResponse } from "../../shared/sendResponse";
+import { AssignmentReviewService } from "./assignmentReview.service";
+import { parseReviewId, parseSubmissionId } from "./assignmentReview.validation";
+
+const createReview = CatchAsync(async (req: Request, res: Response) => {
+  const result = await AssignmentReviewService.createReview(
+    getAuthSession(res).user.id,
+    req.body,
+  );
+  sendResponse(res, {
+    statusCode: status.CREATED,
+    success: true,
+    message: "Review submitted successfully",
+    data: result,
+  });
+});
+
+const getAllSubmissions = CatchAsync(async (_req: Request, res: Response) => {
+  const result = await AssignmentReviewService.getAllSubmissions(getAuthSession(res).user.id);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Submissions fetched successfully",
+    data: result,
+  });
+});
+
+const getSingleSubmission = CatchAsync(async (req: Request, res: Response) => {
+  const result = await AssignmentReviewService.getSingleSubmission(
+    getAuthSession(res).user.id,
+    parseSubmissionId(req.params.id),
+  );
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Submission fetched successfully",
+    data: result,
+  });
+});
+
+const getMyReviews = CatchAsync(async (_req: Request, res: Response) => {
+  const result = await AssignmentReviewService.getMyReviews(getAuthSession(res).user.id);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Your reviews fetched successfully",
+    data: result,
+  });
+});
+
+const getMyReview = CatchAsync(async (req: Request, res: Response) => {
+  const result = await AssignmentReviewService.getMyReview(
+    getAuthSession(res).user.id,
+    parseReviewId(req.params.id),
+  );
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Your review fetched successfully",
+    data: result,
+  });
+});
+
+const updateReview = CatchAsync(async (req: Request, res: Response) => {
+  const result = await AssignmentReviewService.updateReview(
+    getAuthSession(res).user.id,
+    parseReviewId(req.params.id),
+    req.body,
+  );
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Review updated successfully",
+    data: result,
+  });
+});
+
+export const AssignmentReviewController = {
+  createReview,
+  getAllSubmissions,
+  getSingleSubmission,
+  getMyReviews,
+  getMyReview,
+  updateReview,
+};

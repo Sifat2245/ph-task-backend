@@ -1,0 +1,14 @@
+import { Router } from "express";
+import { UserRole } from "../../../generated/prisma/enums";
+import { checkAuth } from "../../middleware/checkAuth";
+import { AssignmentReviewController } from "./assignmentReview.controller";
+
+export const assignmentReviewRoutes = Router();
+
+assignmentReviewRoutes.use(checkAuth(UserRole.ADMIN, UserRole.MENTOR));
+assignmentReviewRoutes.get("/get-all-submissions", AssignmentReviewController.getAllSubmissions);
+assignmentReviewRoutes.get("/get-single-submission/:id", AssignmentReviewController.getSingleSubmission);
+assignmentReviewRoutes.post("/create-review", AssignmentReviewController.createReview);
+assignmentReviewRoutes.get("/get-my-reviews", AssignmentReviewController.getMyReviews);
+assignmentReviewRoutes.get("/get-my-review/:id", AssignmentReviewController.getMyReview);
+assignmentReviewRoutes.put("/update-review/:id", AssignmentReviewController.updateReview);
