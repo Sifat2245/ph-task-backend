@@ -4,8 +4,9 @@
   "description": "Submitly API for assignment submissions, sequential student progress, and mentor reviews.",
   "main": "dist/src/server.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "start": "node --import tsx dist/src/server.js",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "dev": "tsx watch src/server.ts",
     "lint": "eslint src prisma",
     "typecheck": "tsc --noEmit",
@@ -23,7 +24,6 @@
     "better-auth"
   ],
   "type": "module",
-  "postinstall": "prisma generate",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/cookie-parser": "^1.4.10",
