@@ -4,7 +4,10 @@ import { getAuthSession } from "../../middleware/checkAuth.js";
 import { CatchAsync } from "../../shared/catchAsync.js";
 import { sendResponse } from "../../shared/sendResponse.js";
 import { AssignmentReviewService } from "./assignmentReview.service.js";
-import { parseReviewId, parseSubmissionId } from "./assignmentReview.validation.js";
+import {
+  parseReviewId,
+  parseSubmissionId,
+} from "./assignmentReview.validation.js";
 
 const createReview = CatchAsync(async (req: Request, res: Response) => {
   const result = await AssignmentReviewService.createReview(
@@ -45,8 +48,20 @@ const getSingleSubmission = CatchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getSubmissionStats = CatchAsync(async (req: Request, res: Response) => {
+  const result = await AssignmentReviewService.getSubmissionStats(req.query);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Submission statistics fetched successfully",
+    data: result,
+  });
+});
+
 const getMyReviews = CatchAsync(async (_req: Request, res: Response) => {
-  const result = await AssignmentReviewService.getMyReviews(getAuthSession(res).user.id);
+  const result = await AssignmentReviewService.getMyReviews(
+    getAuthSession(res).user.id,
+  );
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
@@ -85,6 +100,7 @@ const updateReview = CatchAsync(async (req: Request, res: Response) => {
 export const AssignmentReviewController = {
   createReview,
   getAllSubmissions,
+  getSubmissionStats,
   getSingleSubmission,
   getMyReviews,
   getMyReview,

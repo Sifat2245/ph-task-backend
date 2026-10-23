@@ -52,8 +52,9 @@ cp .env.example .env
 ```
 
 Set `DATABASE_URL`, `DIRECT_URL`, and three independent secrets:
-`BETTER_AUTH_SECRET`, `JWT_ACCESS_SECRET`, and `JWT_REFRESH_SECRET`. Keep
-`BETTER_AUTH_URL` consistent with the server's origin and configured `PORT`.
+`BETTER_AUTH_SECRET`, `JWT_ACCESS_SECRET`, and `JWT_REFRESH_SECRET`. Set
+`BETTER_AUTH_URL` to the public origin serving authentication endpoints. When
+proxying API requests through Next.js, use the frontend origin.
 
 Generate a random secret with Node.js; run this separately for each secret:
 
@@ -121,7 +122,7 @@ and seeding still use `tsx` to run the TypeScript source files.
 | `COOKIE_DOMAIN` | Optional parent domain for sharing auth cookies across frontend/API subdomains | `.submitly.example` |
 | `DATABASE_URL` | Application PostgreSQL connection; required | Pooled URL when available |
 | `DIRECT_URL` | PostgreSQL connection used by Prisma CLI; required | Direct URL |
-| `BETTER_AUTH_URL` | Backend origin used by Better Auth; required | `http://localhost:3000` |
+| `BETTER_AUTH_URL` | Public Better Auth origin; use the frontend origin when API requests are proxied through Next.js; required | `http://localhost:3000` |
 | `BETTER_AUTH_SECRET` | Better Auth signing secret; required | Independent random secret, at least 32 characters |
 | `JWT_ACCESS_SECRET` | Access JWT signing secret; required | Independent random secret |
 | `JWT_REFRESH_SECRET` | Refresh JWT signing secret; required | Independent random secret |
@@ -321,6 +322,7 @@ assignments return `403` on reads and writes.
 | Method | Endpoint | Access |
 | --- | --- | --- |
 | GET | `/api/v1/assignment-review/get-all-submissions` | Admin, mentor |
+| GET | `/api/v1/assignment-review/get-submission-stats` | Admin, mentor |
 | GET | `/api/v1/assignment-review/get-single-submission/:id` | Admin, mentor |
 | POST | `/api/v1/assignment-review/create-review` | Admin, mentor |
 | GET | `/api/v1/assignment-review/get-my-reviews` | Admin, mentor; own reviews |
@@ -336,6 +338,14 @@ include all reviewers' reviews so admins and mentors can see the same feedback.
 The submission list is paginated and its total counts submissions, excluding
 skips and records without revisions.
 
+The list accepts `searchTerm` (student name or student ID, case-insensitive),
+`assignmentId`, `status` (`PENDING` or `REVIEWED`), and `studentId` (the student
+profile UUID). Filters combine with AND and run before pagination. Search terms
+are trimmed, limited to 100 characters, and treat `%` and `_` literally.
+Malformed IDs, statuses, repeated filters, and unknown query fields return `400`.
+The statistics route accepts the same filters and returns
+`{ total, pending, reviewed }` inside `data` for dashboard counts.
+
 Use a submission UUID for `get-single-submission/:id`, a revision UUID to create
 a review, and a review UUID to view or update a review. Reviewers can edit only
 their own reviews, including admins; another reviewer's ID returns `404`.
@@ -347,6 +357,7 @@ The student list and staff submission list accept `page` and `limit`:
 ```http
 GET /api/v1/student/get-all-students?page=2&limit=5
 GET /api/v1/assignment-review/get-all-submissions?page=2&limit=5
+GET /api/v1/assignment-review/get-all-submissions?page=1&limit=10&searchTerm=STU-001&status=PENDING
 ```
 
 Both routes default to `page=1` and `limit=10`. Values must be positive integers,
@@ -415,14 +426,26 @@ Updates accept any non-empty subset of these fields.
 ```json
 {
   "assignmentId": "ASSIGNMENT_UUID",
-  "submissionItems": "https://github.com/example/portfolio",
-  "note": "Deployed portfolio and source code."
+  "projectName": "Personal portfolio",
+  "repoUrl": "https://github.com/example/portfolio",
+  "liveLink": "https://portfolio.example.com",
+  "description": "A responsive portfolio with projects, skills, and a contact form.",
+  "note": "The contact form uses a demo email service."
 }
 ```
 
-`submissionItems` is a required string; `note` is also required. Both are trimmed
-and must be non-blank. A successful response contains `submission`, `revision`,
-`progress`, and `nextAssignment`.
+Project name (3–150 characters), repository URL, live link, and description
+(10–10,000 characters) are required. URLs must be absolute HTTP(S) URLs of at
+most 2,048 characters without embedded credentials; they are normalized before
+storage. The reviewer note is optional, trimmed, and limited to 5,000 characters.
+Unknown fields, including the removed `submissionItems`, return `400`.
+
+A successful response contains `submission`, `revision`, `progress`, and
+`nextAssignment`. Every submission and review GET exposes the project fields
+on its revisions. Each student has one submission per assignment; resubmitting
+changed details creates a new revision and restores `PENDING`. Sending the same
+details as the latest revision returns `409`, including duplicate concurrent
+requests, and leaves existing reviews/status unchanged.
 
 ### Skip an assignment
 

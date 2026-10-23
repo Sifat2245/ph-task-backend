@@ -2,8 +2,11 @@ model SubmissionRevision {
   id              String               @id @default(uuid())
   submissionId    String
   version         Int                  @default(1)
-  submissionItems String               @map("submission_items")
-  note            String
+  projectName     String               @map("project_name") @db.VarChar(150)
+  repoUrl         String               @map("repo_url") @db.VarChar(2048)
+  liveLink        String               @map("live_link") @db.VarChar(2048)
+  description     String               @db.Text
+  note            String               @default("")
   submittedAt     DateTime             @default(now())
   submission      AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
   reviews         AssignmentReview[]

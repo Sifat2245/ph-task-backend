@@ -20,11 +20,27 @@ const submitAssignment = async (userId: string, payload: unknown) => {
       studentId,
       data.assignmentId,
     );
-    const existingSubmission = await tx.assignmentSubmission.findFirst({
-      where: { studentId, assignmentId: assignment.id },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    const existingSubmission = await tx.assignmentSubmission.findUnique({
+      where: {
+        studentId_assignmentId: { studentId, assignmentId: assignment.id },
+      },
       include: { revisions: { orderBy: { version: "desc" }, take: 1 } },
     });
+    const { projectName, repoUrl, liveLink, description, note } = data;
+    const project = { projectName, repoUrl, liveLink, description, note };
+    const latestRevision = existingSubmission?.revisions[0];
+    if (
+      latestRevision &&
+      Object.entries(project).every(
+        ([field, value]) =>
+          latestRevision[field as keyof typeof project] === value,
+      )
+    ) {
+      throw new APIError("CONFLICT", {
+        message:
+          "This project is already submitted. Update your project details before resubmitting.",
+      });
+    }
     const submission = existingSubmission
       ? await tx.assignmentSubmission.update({
           where: { id: existingSubmission.id },
@@ -37,8 +53,7 @@ const submitAssignment = async (userId: string, payload: unknown) => {
       data: {
         submissionId: submission.id,
         version: (existingSubmission?.revisions[0]?.version ?? 0) + 1,
-        submissionItems: data.submissionItems,
-        note: data.note,
+        ...project,
       },
     });
     const progress = await tx.submissionProgress.upsert({
@@ -64,9 +79,8 @@ const getMySubmission = async (userId: string, assignmentId: string) => {
   const student = await getStudentProfile(prisma, userId);
   await getUnlockedAssignment(prisma, student.id, assignmentId);
 
-  const submission = await prisma.assignmentSubmission.findFirst({
-    where: { studentId: student.id, assignmentId },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  const submission = await prisma.assignmentSubmission.findUnique({
+    where: { studentId_assignmentId: { studentId: student.id, assignmentId } },
     include: {
       revisions: {
         orderBy: { version: "desc" },
@@ -87,4 +101,7 @@ const getMySubmission = async (userId: string, assignmentId: string) => {
   return submission;
 };
 
-export const AssignmentSubmissionService = { submitAssignment, getMySubmission };
+export const AssignmentSubmissionService = {
+  submitAssignment,
+  getMySubmission,
+};

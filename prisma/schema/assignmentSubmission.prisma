@@ -9,7 +9,7 @@ model AssignmentSubmission {
   assignment   Assignment           @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
   revisions    SubmissionRevision[]
 
-  @@index([studentId, assignmentId])
+  @@unique([studentId, assignmentId])
   @@index([assignmentId])
   @@map("submission")
 }

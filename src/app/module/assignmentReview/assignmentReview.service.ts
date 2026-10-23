@@ -6,6 +6,7 @@ import { paginationUtils } from "../../utils/pagination.js";
 import { withStudentTransaction } from "../assignment/assignment.access.js";
 import {
   parseCreateReview,
+  parseSubmissionFilters,
   parseUpdateReview,
 } from "./assignmentReview.validation.js";
 
@@ -104,35 +105,82 @@ const createReview = async (reviewerId: string, payload: unknown) => {
   );
 };
 
+const getSubmissionWhere = (
+  query: Record<string, unknown>,
+): Prisma.AssignmentSubmissionWhereInput => {
+  const { searchTerm, status, assignmentId, studentId } =
+    parseSubmissionFilters(query);
+  // Treat LIKE metacharacters as literal student-name/ID characters.
+  const search = searchTerm?.replace(/[\\%_]/g, "\\$&");
+  return {
+    revisions: { some: {} },
+    ...(status ? { status } : {}),
+    ...(assignmentId ? { assignmentId } : {}),
+    ...(studentId ? { studentId } : {}),
+    ...(search
+      ? {
+          student: {
+            user: {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { studentId: { contains: search, mode: "insensitive" } },
+              ],
+            },
+          },
+        }
+      : {}),
+  };
+};
+
 const getAllSubmissions = async (
   reviewerId: string,
   query: Record<string, unknown> = {},
 ) => {
   const { page, limit, skip } = paginationUtils.getPaginationOptions(query);
-  const where: Prisma.AssignmentSubmissionWhereInput = { revisions: { some: {} } };
-  const [total, data] = await prisma.$transaction([
-    prisma.assignmentSubmission.count({ where }),
-    prisma.assignmentSubmission.findMany({
-      where,
-      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-      skip,
-      take: limit,
-      include: {
-        ...submissionContext,
-        revisions: {
-          orderBy: { version: "desc" },
-          take: 1,
-          include: {
-            reviews: {
-              where: { mentorId: reviewerId },
-              orderBy: [{ reviewedAt: "desc" }, { id: "desc" }],
+  const where = getSubmissionWhere(query);
+  const [total, data] = await prisma.$transaction(
+    [
+      prisma.assignmentSubmission.count({ where }),
+      prisma.assignmentSubmission.findMany({
+        where,
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        skip,
+        take: limit,
+        include: {
+          ...submissionContext,
+          revisions: {
+            orderBy: { version: "desc" },
+            take: 1,
+            include: {
+              reviews: {
+                where: { mentorId: reviewerId },
+                orderBy: [{ reviewedAt: "desc" }, { id: "desc" }],
+              },
             },
           },
         },
-      },
-    }),
-  ], { isolationLevel: "RepeatableRead" });
+      }),
+    ],
+    { isolationLevel: "RepeatableRead" },
+  );
   return { data, meta: paginationUtils.getPaginationMeta(page, limit, total) };
+};
+
+const getSubmissionStats = async (query: Record<string, unknown> = {}) => {
+  const where = getSubmissionWhere(query);
+  const [total, pending, reviewed] = await prisma.$transaction(
+    [
+      prisma.assignmentSubmission.count({ where }),
+      prisma.assignmentSubmission.count({
+        where: { AND: [where, { status: SubmissionStatus.PENDING }] },
+      }),
+      prisma.assignmentSubmission.count({
+        where: { AND: [where, { status: SubmissionStatus.REVIEWED }] },
+      }),
+    ],
+    { isolationLevel: "RepeatableRead" },
+  );
+  return { total, pending, reviewed };
 };
 
 const getSingleSubmission = async (submissionId: string) => {
@@ -218,6 +266,7 @@ const updateReview = async (
 export const AssignmentReviewService = {
   createReview,
   getAllSubmissions,
+  getSubmissionStats,
   getSingleSubmission,
   getMyReviews,
   getMyReview,
