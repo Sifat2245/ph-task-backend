@@ -1,10 +1,10 @@
 {
-  "name": "backend",
+  "name": "submitly",
   "version": "1.0.0",
-  "description": "",
-  "main": "dist/server.js",
+  "description": "Submitly API for assignment submissions, sequential student progress, and mentor reviews.",
+  "main": "dist/src/server.js",
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "node --import tsx dist/src/server.js",
     "build": "tsc",
     "dev": "tsx watch src/server.ts",
     "lint": "eslint src prisma",
@@ -12,7 +12,16 @@
     "seed": "prisma db seed",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "submitly",
+    "assignment-management",
+    "student-submissions",
+    "mentor-reviews",
+    "express",
+    "typescript",
+    "prisma",
+    "better-auth"
+  ],
   "type": "module",
   "devDependencies": {
     "@eslint/js": "^10.0.1",

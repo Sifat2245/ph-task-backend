@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "rootDir": "./",
+    "allowJs": true,
     "outDir": "./dist",
     "module": "ESNext",
     "moduleResolution": "bundler",

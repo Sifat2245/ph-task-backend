@@ -2,6 +2,7 @@ import { APIError } from "better-auth/api";
 import type { Prisma } from "../../../generated/prisma/client";
 import { SubmissionStatus } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
+import { paginationUtils } from "../../utils/pagination";
 import { withStudentTransaction } from "../assignment/assignment.access";
 import {
   parseCreateReview,
@@ -103,24 +104,36 @@ const createReview = async (reviewerId: string, payload: unknown) => {
   );
 };
 
-const getAllSubmissions = (reviewerId: string) =>
-  prisma.assignmentSubmission.findMany({
-    where: { revisions: { some: {} } },
-    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-    include: {
-      ...submissionContext,
-      revisions: {
-        orderBy: { version: "desc" },
-        take: 1,
-        include: {
-          reviews: {
-            where: { mentorId: reviewerId },
-            orderBy: [{ reviewedAt: "desc" }, { id: "desc" }],
+const getAllSubmissions = async (
+  reviewerId: string,
+  query: Record<string, unknown> = {},
+) => {
+  const { page, limit, skip } = paginationUtils.getPaginationOptions(query);
+  const where: Prisma.AssignmentSubmissionWhereInput = { revisions: { some: {} } };
+  const [total, data] = await prisma.$transaction([
+    prisma.assignmentSubmission.count({ where }),
+    prisma.assignmentSubmission.findMany({
+      where,
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      skip,
+      take: limit,
+      include: {
+        ...submissionContext,
+        revisions: {
+          orderBy: { version: "desc" },
+          take: 1,
+          include: {
+            reviews: {
+              where: { mentorId: reviewerId },
+              orderBy: [{ reviewedAt: "desc" }, { id: "desc" }],
+            },
           },
         },
       },
-    },
-  });
+    }),
+  ], { isolationLevel: "RepeatableRead" });
+  return { data, meta: paginationUtils.getPaginationMeta(page, limit, total) };
+};
 
 const getSingleSubmission = async (
   reviewerId: string,

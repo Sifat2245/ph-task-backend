@@ -19,13 +19,17 @@ const createReview = CatchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getAllSubmissions = CatchAsync(async (_req: Request, res: Response) => {
-  const result = await AssignmentReviewService.getAllSubmissions(getAuthSession(res).user.id);
+const getAllSubmissions = CatchAsync(async (req: Request, res: Response) => {
+  const result = await AssignmentReviewService.getAllSubmissions(
+    getAuthSession(res).user.id,
+    req.query,
+  );
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
     message: "Submissions fetched successfully",
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 

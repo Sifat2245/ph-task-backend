@@ -5,13 +5,14 @@ import { sendResponse } from "../../shared/sendResponse";
 import { StudentService } from "./student.service";
 import { parseStudentId } from "./student.validation";
 
-const getAllStudents = CatchAsync(async (_req: Request, res: Response) => {
-  const result = await StudentService.getAllStudents();
+const getAllStudents = CatchAsync(async (req: Request, res: Response) => {
+  const result = await StudentService.getAllStudents(req.query);
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
     message: "Students fetched successfully",
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 

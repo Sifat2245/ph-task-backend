@@ -2,6 +2,7 @@ import { APIError } from "better-auth/api";
 import type { Prisma } from "../../../generated/prisma/client";
 import { UserRole } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
+import { paginationUtils } from "../../utils/pagination";
 
 const studentSelect = {
   id: true,
@@ -22,12 +23,21 @@ const studentSelect = {
   },
 } satisfies Prisma.StudentSelect;
 
-const getAllStudents = () =>
-  prisma.student.findMany({
-    where: { user: { role: UserRole.STUDENT } },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: studentSelect,
-  });
+const getAllStudents = async (query: Record<string, unknown> = {}) => {
+  const { page, limit, skip } = paginationUtils.getPaginationOptions(query);
+  const where: Prisma.StudentWhereInput = { user: { role: UserRole.STUDENT } };
+  const [total, data] = await prisma.$transaction([
+    prisma.student.count({ where }),
+    prisma.student.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip,
+      take: limit,
+      select: studentSelect,
+    }),
+  ], { isolationLevel: "RepeatableRead" });
+  return { data, meta: paginationUtils.getPaginationMeta(page, limit, total) };
+};
 
 const getSingleStudent = async (id: string) => {
   const student = await prisma.student.findFirst({

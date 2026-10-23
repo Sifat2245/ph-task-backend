@@ -1,245 +1,400 @@
-# Backend
+# Submitly
 
-Express server written in TypeScript.
+Submitly is an assignment submission and review API for students, mentors, and
+admins. Students work through assignments in order, submit projects or record a
+skip, and receive feedback on individual submission revisions.
 
-Install dependencies and start the development server with automatic restarts:
+Built with TypeScript, Express 5, PostgreSQL, Prisma 7, Better Auth, and JWTs.
+
+## Contents
+
+- [Features and roles](#features-and-roles)
+- [Getting started](#getting-started)
+- [Environment variables](#environment-variables)
+- [Development seed data](#development-seed-data)
+- [Authentication](#authentication)
+- [API reference](#api-reference)
+- [Pagination](#pagination)
+- [Request examples](#request-examples)
+- [Assignment and review workflow](#assignment-and-review-workflow)
+- [Response format](#response-format)
+- [Data model and IDs](#data-model-and-ids)
+- [Project structure](#project-structure)
+- [Commands](#commands)
+
+## Features and roles
+
+| Role | Access |
+| --- | --- |
+| `STUDENT` | Register, access unlocked assignments, submit or skip assignments, view personal submissions, revisions, skips, and received reviews |
+| `MENTOR` | Manage assignments, view students and submissions, create reviews, and view or edit their own reviews |
+| `ADMIN` | Mentor permissions plus creating, listing, updating, and deleting mentor accounts |
+
+The API enforces assignment order and role permissions on the server. Submission,
+progress, revision, and review changes use Prisma transactions. Progress changes
+and reviews share a student profile lock to coordinate simultaneous requests.
+
+## Getting started
+
+### Requirements
+
+- Node.js 24 or newer and npm.
+- A PostgreSQL database, including a hosted provider such as Neon.
+- A pooled application connection and a direct migration connection when the
+  database provider supplies both.
+
+### 1. Configure the environment
+
+From the repository root:
 
 ```sh
-npm install
+cp .env.example .env
+```
+
+Set `DATABASE_URL`, `DIRECT_URL`, and three independent secrets:
+`BETTER_AUTH_SECRET`, `JWT_ACCESS_SECRET`, and `JWT_REFRESH_SECRET`. Keep
+`BETTER_AUTH_URL` consistent with the server's origin and configured `PORT`.
+
+Generate a random secret with Node.js; run this separately for each secret:
+
+```sh
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+Configuration is loaded and validated by [src/config/env.ts](src/config/env.ts).
+The `.env` file is ignored by Git; [.env.example](.env.example) documents the
+available settings.
+
+### 2. Install dependencies and prepare the database
+
+```sh
+npm ci
+npx prisma generate
+npx prisma migrate deploy
+npm run seed
+```
+
+`migrate deploy` applies the migrations already included in this repository.
+Seeding creates the development accounts and assignments listed below. Prisma
+Client is generated into `src/generated/prisma`, which is ignored by Git.
+
+### 3. Start the development server
+
+```sh
 npm run dev
 ```
 
-Copy `.env.example` to `.env` in the project root and fill in all required values.
-`src/config/env.ts` loads and validates the configuration used by the server,
-Better Auth, the Prisma client, and Prisma CLI. For example, set the environment
-and port with:
-
-```dotenv
-NODE_ENV=development
-PORT=4000
-```
-
-JWT helpers use `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` from `.env`.
-`tokenUtils.getAccessToken(payload)` expires after one day, and
-`tokenUtils.getRefreshToken(payload)` expires after seven days by default.
-Set `JWT_ACCESS_EXPIRES_IN` and `JWT_REFRESH_EXPIRES_IN` to change those durations
-(for example, `1d` and `7d`). Both helpers use `jwtUtils.createToken`.
-
-Cookie setters are available through `tokenUtils`:
-
-```ts
-tokenUtils.setAccessTokenCookie(res, result.data.accessToken);
-tokenUtils.setRefreshTokenCookie(res, result.data.refreshToken);
-tokenUtils.setBetterAuthSessionCookie(res, result.data.token);
-```
-
-Signup and signin set the `accessToken`, `refreshToken`, and `betterAuthSession`
-cookies and return those token values in the response. Their lifetimes use
-`JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`, and
-`BETTER_AUTH_SESSION_TOKEN_EXPIRES_IN`. Cookies use `HttpOnly`, `Secure`, and
-`SameSite=None`.
-
-The controllers also forward Better Auth's signed session and companion cookies,
-which `/api/auth/get-session` and protected routes use to resolve the session.
-Logout clears the three application cookies and Better Auth's cookies.
-
-Better Auth session lifetimes and refresh intervals use
-`BETTER_AUTH_SESSION_TOKEN_EXPIRES_IN` and
-`BETTER_AUTH_UPDATE_TOKEN_EXPIRES_IN`, both defaulting to `1d`. Durations are
-validated when the server starts; Express receives milliseconds and Better Auth
-receives seconds.
-
-Restart the development server after changing `.env`. You can also set `PORT`
-directly in the shell; it takes precedence over `.env`:
+The example configuration uses `http://localhost:3000`. Check the server with:
 
 ```sh
-PORT=4000 npm run dev
+curl http://localhost:3000/health
 ```
 
-For Neon, configure both database URLs in `.env` using the connection strings
-from the Neon console. `DATABASE_URL` is the pooled connection for the app.
-`DIRECT_URL` is the direct connection for Prisma CLI commands; its hostname
-omits `-pooler`. Add `connect_timeout=15` to `DIRECT_URL` to allow time for an
-idle database to wake up. See `.env.example` for the required variables.
+The health endpoint returns `{ "status": "ok" }` and does not query the database.
 
-Create and apply development migrations, then regenerate the Prisma client:
+### 4. Build and run the compiled application
 
 ```sh
-npx prisma migrate dev --name init
-npx prisma generate
+npm run build
+npm start
 ```
 
-Seed the five assignments, one admin, five mentors, and ten students:
+The compiled entry point is `dist/src/server.js`. The start command uses the
+installed `tsx` loader to resolve the project's extensionless ESM imports;
+`tsx` must remain available in the runtime installation.
+
+## Environment variables
+
+| Variable | Purpose | Default or example |
+| --- | --- | --- |
+| `NODE_ENV` | Runtime environment; required | `development` |
+| `PORT` | HTTP server port; required | `3000` |
+| `DATABASE_URL` | Application PostgreSQL connection; required | Pooled URL when available |
+| `DIRECT_URL` | PostgreSQL connection used by Prisma CLI; required | Direct URL |
+| `BETTER_AUTH_URL` | Backend origin used by Better Auth; required | `http://localhost:3000` |
+| `BETTER_AUTH_SECRET` | Better Auth signing secret; required | Independent random secret, at least 32 characters |
+| `JWT_ACCESS_SECRET` | Access JWT signing secret; required | Independent random secret |
+| `JWT_REFRESH_SECRET` | Refresh JWT signing secret; required | Independent random secret |
+| `JWT_ACCESS_EXPIRES_IN` | Access JWT and cookie lifetime | `1d` |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh JWT and cookie lifetime | `7d` |
+| `BETTER_AUTH_SESSION_TOKEN_EXPIRES_IN` | Better Auth session lifetime | `1d` |
+| `BETTER_AUTH_UPDATE_TOKEN_EXPIRES_IN` | Better Auth session update interval | `1d` |
+| `SEED_ADMIN_PASSWORD` | Password for newly seeded admin accounts | `Admin123!` |
+| `SEED_MENTOR_PASSWORD` | Password for newly seeded mentor accounts | `Mentor123!` |
+| `SEED_STUDENT_PASSWORD` | Password for newly seeded student accounts | `Student123!` |
+
+Durations accept values such as `1d`, `7d`, or `12h`, and must be at least one
+second. Restart the server after changing `.env`. Existing process environment
+variables take precedence over values in the file.
+
+For Neon, use the pooled connection for `DATABASE_URL` and the direct connection
+for `DIRECT_URL`. The example direct URL includes `connect_timeout=15` to allow
+an idle database time to wake up.
+
+## Development seed data
 
 ```sh
 npm run seed
 ```
 
-New development seed accounts use these credentials by default:
+### Accounts
 
-| Role | Email | Password |
+| Role | Email | Default password |
 | --- | --- | --- |
 | Admin | `admin@example.com` | `Admin123!` |
-| Mentor | `mentor1@example.com` through `mentor5@example.com` | `Mentor123!` |
-| Student | `student1@example.com` through `student10@example.com` | `Student123!` |
+| Mentors | `mentor1@example.com` through `mentor5@example.com` | `Mentor123!` |
+| Students | `student1@example.com` through `student10@example.com` | `Student123!` |
 
-Set `SEED_ADMIN_PASSWORD`, `SEED_MENTOR_PASSWORD`, and `SEED_STUDENT_PASSWORD`
-in `.env` before seeding to choose different passwords for new accounts.
-The seed uses Better Auth sign-up
-to create credential accounts, assigns the requested roles, and records the admin
-as each new mentor's creator. It removes the sessions created during seeding.
-Admin and mentor accounts have a null student ID and no `Student` profile.
-Students use `AuthService.createStudent` to receive a unique student ID and a
-linked `Student` profile. New students also reference the admin as their creator.
+Set the `SEED_*_PASSWORD` variables before seeding to choose passwords for new
+accounts. Account creation uses Better Auth. Each student receives a `Student`
+profile and a generated public code such as `STU-001`. Newly seeded mentors and
+students reference the seeded admin as their creator, and their automatic signup
+sessions are removed.
 
-Rerunning the seed updates assignments by their unique assignment number and
-keeps existing account IDs, student IDs, profiles, passwords, and sessions. It
-stops if a seed email belongs to a different role, has no credential password,
-or is a student missing its student ID or profile. The assignment data
-is stored in `prisma/seed-data.ts` and the script in `prisma/seed.ts`.
+### Assignments
 
-Available endpoints:
+| Number | Assignment | Maximum marks |
+| --- | --- | --- |
+| 1 | Personal Portfolio Website | 50 |
+| 2 | Task Management Application | 50 |
+| 3 | Product Listing Dashboard | 50 |
+| 4 | Full-Stack Blog Application | 50 |
+| 5 | Final Full-Stack Project | 60 |
 
-- `GET /` returns a welcome message.
-- `GET /health` returns `{ "status": "ok" }`.
-- `POST /api/v1/auth/signup` registers a student and returns `201`; duplicate emails
-  return `422`, and invalid requests return `400`.
-- `POST /api/v1/user/create-mentor` lets an admin create a mentor.
-- `GET /api/v1/user/get-all-mentors` lets an admin list all mentors.
-- `PUT /api/v1/user/update-mentor/:id` lets an admin update a mentor.
-- `DELETE /api/v1/user/delete-mentor/:id` lets an admin delete a mentor.
-- `POST /api/v1/assignment/create-assignment` lets an admin or mentor create an assignment.
-- `GET /api/v1/assignment/get-all-assignments` lets any signed-in user list assignments.
-- `GET /api/v1/assignment/get-single-assignment/:id` lets any signed-in user fetch one assignment.
-- `PUT /api/v1/assignment/update-assignment/:id` lets an admin or mentor update an assignment.
-- `DELETE /api/v1/assignment/delete-assignment/:id` lets an admin or mentor delete an assignment.
-- `POST /api/v1/auth/signin` signs in using Better Auth and returns a session token
-  in `data.token`, the user in `data.user`, access and refresh JWTs, and
-  authentication cookies.
-- `POST /api/v1/auth/logout` signs out the session identified by the request's
-  cookies, deletes that session, and clears authentication cookies.
-- `POST /api/auth/sign-in/email` signs in with email and password.
-- `GET /api/auth/get-session` returns the current session and user.
+Rerunning the seed updates assignment definitions by assignment number while
+preserving existing account IDs, student codes, profiles, passwords, and
+sessions. It stops if an existing seed account has an unexpected role, missing
+credentials, or an incomplete student profile.
 
-Better Auth is mounted before `express.json()` so it can read request bodies.
-Set `BETTER_AUTH_SECRET` to a random secret of at least 32 characters and
-`BETTER_AUTH_URL` to the server URL, as shown in `.env.example`.
+Source: [prisma/seed.ts](prisma/seed.ts) and
+[prisma/seed-data.ts](prisma/seed-data.ts). Seeding does not create submissions,
+skips, or reviews.
 
-Mentor management requires the signed-in admin's session and access token cookies.
-The middleware verifies the access JWT's signature and expiration and requires
-its `userId` to match the session user. Missing, invalid, expired, or mismatched
-credentials return `401`; authenticated students and mentors receive `403`.
-Refresh tokens are reserved for renewing access tokens and do not authorize
-protected requests. The middleware
-reads `betterAuthSession` with `cookieUtils` and looks up an unexpired Prisma
-session including its user. It checks the user's current database role and also
-accepts Better Auth's verified signed session cookie when the application cookie
-is absent. Admins and students cannot
-be updated or deleted through the mentor routes; those IDs return `404`.
+## Authentication
 
-Create a mentor with `name`, `email`, `password`, and an optional `image` URL.
-`UserService.createUser` uses Better Auth's `signUpEmail`, then a Prisma
-transaction sets the `MENTOR` role and the admin's `createdById`, and removes the
-mentor's automatic signup session. It deletes the newly registered user if this
-transaction fails. The response contains the mentor; the admin stays signed in.
+Use the custom auth routes under `/api/v1/auth` for registration and login.
+They use Better Auth for credentials and sessions and issue the application's
+access and refresh JWTs.
 
-Updates accept any non-empty combination of `name`, `email`, `password`, and
-`image`; use `image: null` to clear the image. Password changes use Better Auth's
-configured password hasher. Email and password changes revoke the mentor's
-sessions in the same transaction; changing email also clears `emailVerified`.
-Duplicate email updates return `409`, and duplicate signup emails return `422`.
-The mentor's role, creator, and student ID cannot be set in the request body.
-Deleting a mentor also deletes their credential accounts and sessions.
+Register a student with:
 
-Assignment management uses the assignment module's routes, controllers, service,
-and validation. All signed-in users (`ADMIN`, `MENTOR`, and `STUDENT`) can list
-assignments and fetch one by its UUID, using their session and access token cookies.
-The list returns all assignments ordered by `assignmentNumber` ascending; an empty
-list returns `200` with `data: []`. A valid UUID with no matching assignment returns
-`404`, and an invalid UUID returns `400`.
+```json
+{
+  "name": "Example Student",
+  "email": "student@example.com",
+  "password": "StudentPassword123!"
+}
+```
 
-Creating, updating, and deleting assignments requires a valid session and access
-token for an `ADMIN` or `MENTOR`. Both roles can update and delete any assignment.
-Students receive `403` for those operations; missing or invalid credentials
-receive `401` on every assignment route.
+Send this body to `POST /api/v1/auth/signup`. Registration creates the student
+profile and public student code. Role, profile IDs, and creator information are
+controlled by the server. If profile creation fails, the newly created Better
+Auth user is removed along with its dependent auth records.
 
-Create an assignment with all four fields:
+Sign in and save the cookies:
+
+```sh
+curl -c cookies.txt http://localhost:3000/api/v1/auth/signin \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"student1@example.com","password":"Student123!","rememberMe":true}'
+
+curl -b cookies.txt http://localhost:3000/api/v1/assignment/get-all-assignments
+```
+
+All roles use the same signin endpoint. `rememberMe` is optional and defaults to
+`true`. Signup and signin return `data.token`, `data.user`, `data.accessToken`,
+and `data.refreshToken`. Signup also returns `data.student` and `data.session`.
+
+Protected business routes require both a valid access JWT and an unexpired
+Better Auth session belonging to the same user. The middleware checks the user's
+current database role. The controllers set `accessToken`, `refreshToken`, and
+`betterAuthSession` cookies and forward Better Auth's signed session cookies.
+
+Cookies use `HttpOnly`, `Secure`, and `SameSite=None`. Send cookies with protected
+requests; browser clients use `credentials: "include"`. Deployed browser flows
+should use HTTPS. The server currently has no CORS middleware, so a frontend on a
+different origin also needs CORS and trusted-origin configuration.
+
+`GET /api/auth/get-session` is provided by Better Auth and returns its native
+session/user response. The native HTTP signup route `/api/auth/sign-up/email` is
+blocked to keep student profile creation in the application service. Use the
+custom signin route to receive the access JWT required by protected routes.
+
+Refresh JWTs are issued, but a refresh-token exchange endpoint has not been
+implemented. Sign in again when access credentials expire.
+
+Log out and clear the cookie jar:
+
+```sh
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:3000/api/v1/auth/logout
+```
+
+Logout removes the current session and clears its cookies while preserving other
+sessions and the user account.
+
+## API reference
+
+The following custom endpoints use the `/api/v1` prefix. Protected requests need
+the authentication cookies described above.
+
+### Authentication
+
+| Method | Endpoint | Access |
+| --- | --- | --- |
+| POST | `/api/v1/auth/signup` | Public; creates a student |
+| POST | `/api/v1/auth/signin` | Public; all roles |
+| POST | `/api/v1/auth/logout` | Current session |
+
+### Mentor management
+
+| Method | Endpoint | Access |
+| --- | --- | --- |
+| POST | `/api/v1/user/create-mentor` | Admin |
+| GET | `/api/v1/user/get-all-mentors` | Admin |
+| PUT | `/api/v1/user/update-mentor/:id` | Admin |
+| DELETE | `/api/v1/user/delete-mentor/:id` | Admin |
+
+Mentor `:id` values are `User.id` UUIDs. Email or password updates revoke the
+mentor's sessions; an email change also clears `emailVerified`. Deleting a mentor
+with review records returns `409` to preserve review history.
+
+### Student directory
+
+| Method | Endpoint | Access |
+| --- | --- | --- |
+| GET | `/api/v1/student/get-all-students` | Admin, mentor |
+| GET | `/api/v1/student/get-single-student/:id` | Admin, mentor |
+
+Use the `Student.id` profile UUID returned as `data[].id` by the list. Responses
+include profile information and a nested `user` with name, email, image, public
+student code, role, and timestamps. Authentication records are excluded. Lists
+contain only profiles whose user currently has the `STUDENT` role, newest first.
+The list is paginated; see [Pagination](#pagination) for query parameters and metadata.
+
+### Assignment management
+
+| Method | Endpoint | Access |
+| --- | --- | --- |
+| GET | `/api/v1/assignment/get-all-assignments` | All signed-in roles |
+| GET | `/api/v1/assignment/get-single-assignment/:id` | All signed-in roles; student lock rules apply |
+| POST | `/api/v1/assignment/create-assignment` | Admin, mentor |
+| PUT | `/api/v1/assignment/update-assignment/:id` | Admin, mentor |
+| DELETE | `/api/v1/assignment/delete-assignment/:id` | Admin, mentor |
+
+Assignments are listed by `assignmentNumber` ascending. Student list responses
+include `isLocked` and `progressState`. Locked items retain their title, number,
+and maximum marks, with `description: null`; their detail route returns `403`.
+Admins and mentors can read every assignment. Deleting an assignment with
+submission, skip, or progress records returns `409`.
+
+### Student submissions and skips
+
+| Method | Endpoint | Access |
+| --- | --- | --- |
+| POST | `/api/v1/assignment-submission/submit-assignment` | Student |
+| GET | `/api/v1/assignment-submission/get-my-submission/:assignmentId` | Student; own record |
+| POST | `/api/v1/submission-skip/skip-assignment` | Student |
+| GET | `/api/v1/submission-skip/get-my-skip/:assignmentId` | Student; own record |
+
+The student comes from the authenticated session. The submission GET includes
+revisions and received reviews, newest first, with each reviewer's ID and name.
+The skip GET returns the latest historical skip, even if the assignment was
+subsequently submitted. Missing personal records return `404`; locked
+assignments return `403` on reads and writes.
+
+### Submission reviews
+
+| Method | Endpoint | Access |
+| --- | --- | --- |
+| GET | `/api/v1/assignment-review/get-all-submissions` | Admin, mentor |
+| GET | `/api/v1/assignment-review/get-single-submission/:id` | Admin, mentor |
+| POST | `/api/v1/assignment-review/create-review` | Admin, mentor |
+| GET | `/api/v1/assignment-review/get-my-reviews` | Admin, mentor; own reviews |
+| GET | `/api/v1/assignment-review/get-my-review/:id` | Admin, mentor; own review |
+| PUT | `/api/v1/assignment-review/update-review/:id` | Admin, mentor; own review |
+
+The submission list contains actual submissions and their latest revisions,
+excluding skips and submission records without revisions. The detail route
+includes all revisions. Both views include student and assignment details and
+the signed-in reviewer's reviews.
+The submission list is paginated and its total counts submissions, excluding
+skips and records without revisions.
+
+Use a submission UUID for `get-single-submission/:id`, a revision UUID to create
+a review, and a review UUID to view or update a review. Reviewers can edit only
+their own reviews, including admins; another reviewer's ID returns `404`.
+
+## Pagination
+
+The student list and staff submission list accept `page` and `limit`:
+
+```http
+GET /api/v1/student/get-all-students?page=2&limit=5
+GET /api/v1/assignment-review/get-all-submissions?page=2&limit=5
+```
+
+Both routes default to `page=1` and `limit=10`. Values must be positive integers,
+and `limit` cannot exceed `100`. Invalid, repeated, or excessively large
+pagination values return `400`. Both endpoints remain restricted to admins and
+mentors.
+
+Responses keep `data` as an array and include a top-level `meta` object:
+
+```json
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Students fetched successfully",
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 0,
+    "totalPages": 0
+  },
+  "data": []
+}
+```
+
+`total` is the number of matching records across all pages. `totalPages` is
+`Math.ceil(total / limit)`. Empty collections and pages beyond the last page
+return `200` with `data: []`; the requested page is preserved in `meta`. Counts
+and page records are read in one consistent database snapshot. Existing ordering
+is preserved with a UUID tie-breaker. Other endpoints omit `meta`.
+
+## Request examples
+
+### Create or update a mentor
+
+```json
+{
+  "name": "Example Mentor",
+  "email": "mentor@example.com",
+  "password": "MentorPassword123!",
+  "image": "https://example.com/avatar.png"
+}
+```
+
+Creation requires `name`, `email`, and `password`; `image` is optional. Updates
+accept any non-empty combination of these fields, including `image: null` to
+clear the image. Passwords must satisfy Better Auth's configured length limits
+(currently 8–128 characters).
+
+### Create or update an assignment
 
 ```json
 {
   "assignmentNumber": 6,
   "title": "Realtime Chat Application",
-  "description": "Build and deploy a chat application with user authentication.",
+  "description": "Build and deploy a chat application with authentication.",
   "maxMarks": 60
 }
 ```
 
-Assignment numbers must be unique positive integers, and maximum marks must be a
-positive integer. Titles and descriptions must contain non-whitespace text.
-Updates accept any non-empty combination of those four fields. Use the UUID
-returned on creation as `:id`. IDs and creation timestamps are generated by the
-server and cannot be supplied in the request body. Duplicate assignment numbers
-return `409`, missing assignments return `404`, and invalid input returns `400`.
+Creation requires all four fields. `assignmentNumber` must be a unique positive
+integer, and `maxMarks` must be a positive integer. Text must be non-blank.
+Updates accept any non-empty subset of these fields.
 
-`AssignmentSubmission` maps to the `submission` table and records a student,
-assignment, status, and creation/update timestamps. `SubmissionStatus` contains
-`PENDING` (the default) and `REVIEWED`. `SubmissionSkip` maps to `assignment_skip`
-and records a student, assignment, required reason, and `skippedAt` timestamp.
-
-Both tables reference the UUIDs in `Student.id` and `Assignment.id`; `studentId`
-is the student profile ID. Student/assignment pairs are indexed and can have
-multiple records. The parent models expose `submissions` and `submissionSkips`.
-Foreign keys protect referenced students and assignments from deletion; deleting
-an assignment with submission, skip, or progress records returns `409`.
-
-`SubmissionProgress` maps to `assignment_submission_progress`. It stores one
-current state per student profile and assignment, enforced by a unique
-`[studentId, assignmentId]` pair. `SubmissionProgressState` contains `SUBMITTED`
-and `SKIPPED`; callers must explicitly supply the state. Prisma updates
-`updatedAt` automatically. The `Student` and `Assignment` models expose
-`submissionProgress` relations. Submission review uses the separate
-`SubmissionStatus` enum (`PENDING`, `REVIEWED`).
-
-`SubmissionRevision` maps to `submission_revision` and references
-`AssignmentSubmission.id` through `submissionId`. It contains an integer
-`version` (default `1`), required `submissionItems` string (mapped to the
-`submission_items` column), one required `note` string, and a `submittedAt`
-timestamp. `[submissionId, version]` is unique; subsequent revisions must
-explicitly supply the next version number. `AssignmentSubmission.revisions`
-provides the reverse relation, and referenced submissions cannot be deleted.
-Creating a submission or skip does not automatically update progress or create
-a revision at the schema level. The student submission and skip services write
-the corresponding records and progress together in a Prisma transaction.
-
-Student assignment access follows ascending `assignmentNumber`, including gaps
-between numbers. The first assignment is unlocked. Every earlier assignment
-must have `SUBMITTED` or `SKIPPED` progress before a student can read, submit,
-or skip a later assignment. Mentor review is not required to unlock the next
-assignment. Progress belongs to the authenticated student's `Student` profile;
-clients cannot supply a student ID, progress state, revision version, or review
-status. Missing student profiles return `403`.
-
-Both student modules follow the route/controller/service/validation structure:
-
-| Method | Endpoint | Required body |
-| --- | --- | --- |
-| POST | `/api/v1/assignment-submission/submit-assignment` | `assignmentId`, `submissionItems`, `note` |
-| POST | `/api/v1/submission-skip/skip-assignment` | `assignmentId`, `reason` |
-| GET | `/api/v1/assignment-submission/get-my-submission/:assignmentId` | None |
-| GET | `/api/v1/submission-skip/get-my-skip/:assignmentId` | None |
-
-Both GET routes use the assignment UUID in the URL and return only the signed-in
-student's records. Student IDs supplied in query parameters cannot select
-another student's data. Successful reads return `200` with `statusCode`,
-`success`, `message`, and `data` in the response body. Submission data includes
-all revisions ordered newest first, with reviews and the mentor's ID and name.
-The skip route returns the most recent skip record; it remains available as
-history if the student later submits the assignment. An existing, unlocked
-assignment with no corresponding record returns `404`. Invalid IDs return `400`,
-unknown assignments return `404`, and locked assignments return `403`. These
-routes require the `STUDENT` role and do not change progress or unlock assignments.
-
-For example, submit the first assignment after signing in as a student:
+### Submit an assignment
 
 ```json
 {
@@ -249,7 +404,11 @@ For example, submit the first assignment after signing in as a student:
 }
 ```
 
-Or skip it:
+`submissionItems` is a required string; `note` is also required. Both are trimmed
+and must be non-blank. A successful response contains `submission`, `revision`,
+`progress`, and `nextAssignment`.
+
+### Skip an assignment
 
 ```json
 {
@@ -258,60 +417,11 @@ Or skip it:
 }
 ```
 
-Use the assignment UUID from the assignment list. Submission items, notes,
-and skip reasons are required non-whitespace strings. Unknown fields are
-rejected. Both POST routes require the `STUDENT` role and return `201` on success.
-Submitting returns `submission`, `revision`, `progress`, and `nextAssignment`;
-skipping returns `skip`, `progress`, and `nextAssignment`. `nextAssignment`
-contains the next assignment's ID, number, and title, or `null` after the last
-assignment.
+The reason is required and trimmed. A successful response contains `skip`,
+`progress`, and `nextAssignment`. The next assignment contains its ID, number,
+and title, or is `null` after the final assignment.
 
-Submitting creates a submission with a numbered revision and `SUBMITTED`
-progress. Submitting again adds the next revision to the same submission and
-sets its review status back to `PENDING`, preserving previous revisions and
-reviews. A skipped assignment can be submitted later; its skip record remains
-as history and progress becomes `SUBMITTED`. Submitted assignments cannot be
-skipped, and repeating a skip returns `409`. Student progress writes acquire
-a lock on that student's profile row so simultaneous requests cannot duplicate
-submissions, skip records, or revision numbers through these services.
-
-For students, `GET /api/v1/assignment/get-all-assignments` now includes
-`isLocked` and `progressState` (`SUBMITTED`, `SKIPPED`, or `null`) on each item.
-Locked items retain their title, number, and grading metadata, but their
-`description` is `null`. The single-assignment route returns `403` for locked
-assignments. Submission and skip routes enforce the same restriction, including
-requests made directly without the frontend. Invalid payloads return `400`;
-unknown assignment UUIDs return `404`. Admins and mentors keep full read access
-to assignments and cannot use the student submission/skip routes.
-
-`AssignmentReview` maps to `review` and stores `revisionId`, `mentorId`, integer
-`marks`, required `examineFeedback`, and an automatic `reviewedAt` timestamp.
-`revisionId` references `SubmissionRevision.id`; `mentorId` references `User.id`.
-The reverse relations are `SubmissionRevision.reviews` and
-`User.assignmentReviews`. Both foreign keys are indexed, and multiple reviews
-per revision are allowed. Referenced revisions and mentors cannot be deleted;
-the mentor deletion endpoint returns `409` when review records exist.
-
-The assignment review module authorizes `MENTOR` and `ADMIN` users. The existing
-`mentorId` field stores the signed-in reviewer's `User.id` for either role;
-clients cannot supply or change it. Reviewers can view and edit their own
-reviews. Editing another reviewer's review returns `404`, including for admins.
-
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| GET | `/api/v1/assignment-review/get-all-submissions` | View submitted assignments with their latest revision |
-| GET | `/api/v1/assignment-review/get-single-submission/:id` | View one submission and its revision history |
-| POST | `/api/v1/assignment-review/create-review` | Submit a review for a revision |
-| GET | `/api/v1/assignment-review/get-my-reviews` | View all your reviews |
-| GET | `/api/v1/assignment-review/get-my-review/:id` | View one of your reviews |
-| PUT | `/api/v1/assignment-review/update-review/:id` | Edit marks or feedback on your review |
-
-The submission list excludes skips and submission records without revisions.
-Its entries contain the assignment, student name/public student ID, latest
-revision, and the signed-in reviewer's reviews. The single-submission route
-includes all revisions, newest first, with that reviewer's reviews. Use the
-submission UUID for `get-single-submission/:id` and the revision UUID from its
-`revisions` array when creating a review:
+### Create or edit a review
 
 ```json
 {
@@ -322,155 +432,172 @@ submission UUID for `get-single-submission/:id` and the revision UUID from its
 ```
 
 Marks must be integers from `0` to the assignment's `maxMarks`, inclusive.
-Feedback is required and trimmed. Extra fields are rejected. Each reviewer can
-submit one review per revision through the service; duplicates return `409` and
-must be edited through the update route. Different reviewers can review the
-same revision. Creation returns `201`; reads and edits return `200`, all using
-the shared `statusCode`, `success`, `message`, and `data` response structure.
+Feedback is required and trimmed. The reviewer comes from the session; the
+existing `mentorId` field stores the reviewer's user UUID for mentors and admins.
 
-Use a review UUID for the single-review and update routes. Updates accept
-`marks`, `examineFeedback`, or both; an empty update is rejected. Saving an edit
-refreshes `reviewedAt`. Review IDs, reviewer IDs, and revision IDs cannot be
-changed. An empty review list returns `[]`; missing reviews/submissions return
-`404`, and invalid IDs or payloads return `400`.
+The update route accepts `marks`, `examineFeedback`, or both. It refreshes
+`reviewedAt` and rejects an empty update. Reviewer, revision, and review IDs
+cannot be changed. Each reviewer can create one review per revision through the
+service; duplicates return `409`, so use the update route to edit a review.
+Different reviewers can review the same revision.
 
-Review saves and changes to the submission's `REVIEWED` status happen in one
-transaction. A review marks the submission `REVIEWED` only when it targets the
-latest revision. Older revision reviews remain editable without marking a newer
-revision reviewed. New student revisions return the submission to `PENDING`,
-preserving earlier reviews. Review writes share the student's profile lock with
-submission writes, protecting duplicate-review checks and status changes during
-simultaneous requests. Reviews do not change the student's assignment progress.
+Assignment, mentor, submission, skip, and review management reject unsupported
+write fields. IDs, timestamps, roles, revision numbers, and progress states are
+controlled by the server.
 
-The student module lets admins and mentors read student profiles:
+## Assignment and review workflow
 
-| Method | Endpoint | Purpose |
+1. A student starts with the first assignment unlocked.
+2. Submitting or skipping it records `SUBMITTED` or `SKIPPED` progress and unlocks
+   the next assignment immediately. A mentor review is not required to proceed.
+3. Every earlier assignment must have progress before a later assignment can be
+   read, submitted, or skipped. Ordering follows assignment numbers and supports
+   gaps between numbers.
+4. Resubmitting adds the next numbered revision to the same submission and sets
+   its review status to `PENDING`, preserving previous revisions and reviews.
+5. A skipped assignment can be submitted later; the skip remains as history.
+   Submitted assignments cannot be skipped, and repeating a skip returns `409`.
+6. Reviewing the latest revision sets the submission to `REVIEWED`. Creating or
+   editing a historical review does not mark a newer revision reviewed.
+
+The two enums serve different purposes:
+
+| Enum | Values | Meaning |
 | --- | --- | --- |
-| GET | `/api/v1/student/get-all-students` | List student profiles, newest first |
-| GET | `/api/v1/student/get-single-student/:id` | View one student profile |
+| `SubmissionProgressState` | `SUBMITTED`, `SKIPPED` | The student's action and progression |
+| `SubmissionStatus` | `PENDING`, `REVIEWED` | Review state of the submission's latest revision |
 
-Use `id` from the list response for `:id`. This is the `Student.id` profile UUID.
-Each record also includes `userId` and a nested `user` with the user's ID, public
-student code (`studentId`, such as `STU-001`), name, email, image, role, and
-timestamps. Only profiles whose user currently has the `STUDENT` role are
-returned. Accounts, passwords, session tokens, and other authentication details
-are excluded.
+Submit, skip, and review writes run in transactions. Failed writes leave progress
+and review state unchanged. Student profile row locks serialize related writes
+so concurrent submissions, duplicate reviews, and review/resubmission races are
+handled consistently through these services.
 
-Both routes require `ADMIN` or `MENTOR` login cookies and return `200` with the
-shared response structure. An empty list returns `data: []`. Invalid profile
-UUIDs return `400`; missing profiles or profiles belonging to non-students return
-`404`. Requests from students return `403`, and unauthenticated requests return
-`401`.
+## Response format
 
-For example, after signing in as the admin and saving cookies to `cookies.txt`:
+Custom `/api/v1` routes use the same JSON response structure. `statusCode` matches
+the HTTP status. Successful responses include `data`; error responses omit it.
+Paginated list responses also include `meta`, as described in [Pagination](#pagination).
 
-```sh
-curl -b cookies.txt -X POST http://localhost:3000/api/v1/user/create-mentor \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"New Mentor","email":"newmentor@example.com","password":"MentorPassword123!"}'
-
-curl -b cookies.txt http://localhost:3000/api/v1/user/get-all-mentors
-
-curl -b cookies.txt -X PUT http://localhost:3000/api/v1/user/update-mentor/MENTOR_USER_ID \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Updated Mentor"}'
-
-curl -b cookies.txt -X DELETE http://localhost:3000/api/v1/user/delete-mentor/MENTOR_USER_ID
+```json
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Assignments fetched successfully",
+  "data": []
+}
 ```
 
-Test student registration (adjust the port to match `.env`):
-
-```sh
-curl -X POST http://localhost:3000/api/v1/auth/signup \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Test Student","email":"student@example.test","password":"TestPassword123!"}'
+```json
+{
+  "statusCode": 403,
+  "success": false,
+  "message": "Submit or skip assignment 1 to unlock this assignment."
+}
 ```
 
-Student registration requires a name, valid email, and a password with 8 to 128
-characters. A student ID is generated automatically when the account is created:
-`STU-001`, `STU-002`, and so on. Do not include `studentId` in the request;
-client-provided IDs are ignored. The ID stays the same on later logins.
+| Status | Meaning |
+| --- | --- |
+| `200` | Successful read, update, signin, or logout |
+| `201` | Student, mentor, assignment, submission, skip, or review created |
+| `400` | Invalid UUID, payload, marks, or malformed JSON |
+| `401` | Missing, invalid, expired, or mismatched authentication |
+| `403` | Role restriction, missing student profile, or locked assignment |
+| `404` | Missing record, non-owned review, or missing personal submission/skip |
+| `409` | Duplicate assignment/review/skip, duplicate email update, or protected deletion |
+| `422` | Duplicate email during Better Auth signup |
+| `500` | Unexpected server error |
 
-A PostgreSQL sequence prevents duplicate IDs during concurrent registrations and
-starts after existing numeric `STU-` IDs. Numbers can have gaps after failed
-registrations; existing accounts are not renumbered. The padding is a minimum of
-three digits, so numbering continues correctly after `STU-999` as `STU-1000`.
+Empty collection responses return `data: []`. Better Auth's native routes and
+`GET /health` use their own response formats.
 
-Users have the `ADMIN`, `MENTOR`, or `STUDENT` role, defaulting to `STUDENT`.
-Student registration follows the auth module's route, controller, and service.
-`AuthService.createStudent` calls `auth.api.signUpEmail`, letting Better Auth
-validate credentials and create the user, credential account, and session. A
-subsequent Prisma transaction assigns the student ID and creates the `Student`
-profile. If this transaction fails, the catch block deletes the newly registered
-user; its accounts and sessions are deleted through cascading relations.
-`auth.ts` contains configuration without user creation hooks.
+## Data model and IDs
 
-Successful registration returns `data.token`, `data.session`, `data.user`, `data.student`,
-`data.accessToken`, and `data.refreshToken`.
-`data.token` and `data.session.token` are Better Auth's session token. Controllers forward
-Better Auth's `Set-Cookie` headers after the profile transaction succeeds, so the
-returned cookies can immediately be used with `/api/auth/get-session`. Failed
-registration does not forward authentication cookies.
+Prisma models are split across [prisma/schema](prisma/schema).
 
-Registration omits the initial session cache cookie, whose user data predates the
-student profile transaction, so the next session lookup reads the completed user.
+| Model | Purpose |
+| --- | --- |
+| `User` | Identity, email, role, public student code, and creator reference |
+| `Student` | Student profile linked one-to-one with a user |
+| `Assignment` | Numbered assignment definition and maximum marks |
+| `AssignmentSubmission` | A student's submission and current review status |
+| `SubmissionRevision` | Numbered content, note, and submission timestamp |
+| `SubmissionSkip` | Skip reason and timestamp |
+| `SubmissionProgress` | One current state per student/assignment pair |
+| `AssignmentReview` | Revision marks, feedback, reviewer, and review timestamp |
+| `Session`, `Account`, `Verification` | Better Auth records, including credential password hashes |
 
-Both signup and signin return `data.accessToken` (one day by default) and
-`data.refreshToken` (seven days by default). These JWTs contain `userId`, `email`,
-and `role`, signed using the corresponding secrets configured in `.env`.
-Signup generates JWTs within the student profile transaction; if generation
-fails, registration is rolled back and the new Better Auth user is deleted.
-If JWT generation fails during signin, its newly created session is deleted.
-Protected routes validate Better Auth's session cookies.
+Use the correct identifier for each endpoint:
 
-Sign in and save the session cookies, then use them to log out:
+| Identifier | Use |
+| --- | --- |
+| `User.id` | Mentor management and reviewer identity |
+| `Student.id` | Student detail route and student foreign keys |
+| `User.studentId` | Public display code, such as `STU-001` |
+| `Assignment.id` | Assignment routes and submit/skip payloads |
+| `AssignmentSubmission.id` | Staff single-submission route |
+| `SubmissionRevision.id` | `revisionId` when creating a review |
+| `AssignmentReview.id` | Personal review detail and update routes |
 
-```sh
-curl -c cookies.txt -X POST http://localhost:3000/api/v1/auth/signin \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"student@example.test","password":"TestPassword123!","rememberMe":true}'
+Record IDs are UUIDs. Public student codes are generated by a PostgreSQL
+sequence; numbers may have gaps after failed registrations, and padding grows
+beyond three digits when needed. Referenced student, assignment, submission,
+revision, and reviewer records are protected by foreign keys to preserve history.
 
-curl -b cookies.txt -c cookies.txt -X POST http://localhost:3000/api/v1/auth/logout
+## Project structure
+
+```text
+prisma/
+  schema/                 Split Prisma models and enums
+  migrations/             Versioned SQL migrations
+  seed.ts                 Development account and assignment seeding
+  seed-data.ts            Seed assignment definitions
+src/
+  app.ts                  Express setup and route mounting
+  server.ts               Server entry point
+  config/env.ts           Validated environment configuration
+  app/
+    lib/                  Better Auth and Prisma setup
+    middleware/           Authentication and error handling
+    module/
+      auth/
+      user/               Admin mentor management
+      student/            Staff student directory
+      assignment/
+      assignmentSubmission/
+      submissionSkip/
+      assignmentReview/
+    router/               API module registration
+    shared/               Async handler and response helpers
+    utils/                JWT, token, and cookie helpers
+  generated/prisma/       Generated Prisma Client; ignored by Git
 ```
 
-`rememberMe` is optional and defaults to `true`; set it to `false` for a
-non-persistent session cookie. Invalid credentials return `401`, and invalid
-sign-in requests return `400`. Logout is safe to repeat when the session is
-already gone and leaves other sessions and the user account in place.
+Modules follow the route → controller → service → validation structure. Controllers
+use `sendResponse` and `http-status`; errors flow through `CatchAsync` to the
+shared global error handler.
 
-The `Student` model has a unique `userId` relation to `User`. Names, emails, roles,
-and student IDs stay on the user record. New records use UUIDs. The `role`,
-`studentId`, and `createdById` fields are controlled by the server; extra request
-fields are ignored during registration. The generic HTTP sign-up endpoint is
-blocked so registration always goes through the student service. Better Auth's
-server-side sign-up API remains enabled for the service.
+## Commands
 
-The optional `createdById` relation records who created an account. Deleting the
-creator clears this reference without deleting the accounts they created.
-The student ID can be null while Better Auth registration is pending. The
-profile transaction assigns a non-empty student ID before registration succeeds;
-mentors and admins can keep a null student ID. Better Auth stores password hashes in `Account.password`;
-the user model and user responses do not contain passwords.
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the TypeScript server with automatic restarts |
+| `npm run lint` | Check application and Prisma TypeScript files with ESLint |
+| `npm run typecheck` | Check TypeScript without writing build output |
+| `npm run build` | Compile the server and Prisma TypeScript files into `dist/` |
+| `npm start` | Run the compiled server with the installed `tsx` loader |
+| `npm run seed` | Seed development accounts and assignment definitions |
+| `npx prisma generate` | Regenerate Prisma Client after schema changes |
+| `npx prisma migrate deploy` | Apply the existing migrations |
+| `npx prisma migrate dev --name describe_change` | Create and apply a new development migration |
 
-Apply the pending migrations and regenerate the Prisma client after pulling
-these schema changes:
-
-```sh
-npx prisma migrate deploy
-npx prisma generate
-```
-
-Lint, check types, build, and run the compiled server:
+Run the repository checks with:
 
 ```sh
 npm run lint
 npm run typecheck
 npm run build
-npm start
 ```
 
-ESLint uses the recommended JavaScript and TypeScript rules and ignores generated
-build and Prisma Client files.
-
-TypeScript stays on the `6.0.x` release line for compatibility with
-`typescript-eslint`.
+`npm test` is currently a placeholder and does not run a test suite. Database
+migrations, client generation, and seeding are explicit commands; the server does
+not run them automatically at startup.
