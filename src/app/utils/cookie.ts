@@ -1,13 +1,8 @@
 import type { CookieOptions, Request, Response } from "express";
 import { parseCookies } from "better-auth/cookies";
-import { envVariables } from "../../config/env";
+import { authCookieOptions } from "../../config/cookie";
 
-const defaultCookieOptions: CookieOptions = {
-  httpOnly: true,
-  secure: envVariables.NODE_ENV === "production",
-  sameSite: "lax",
-  path: "/",
-};
+const defaultCookieOptions: CookieOptions = authCookieOptions;
 
 const setCookie = (
   res: Response,

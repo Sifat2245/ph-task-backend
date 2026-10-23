@@ -135,10 +135,7 @@ const getAllSubmissions = async (
   return { data, meta: paginationUtils.getPaginationMeta(page, limit, total) };
 };
 
-const getSingleSubmission = async (
-  reviewerId: string,
-  submissionId: string,
-) => {
+const getSingleSubmission = async (submissionId: string) => {
   const submission = await prisma.assignmentSubmission.findFirst({
     where: { id: submissionId, revisions: { some: {} } },
     include: {
@@ -147,8 +144,8 @@ const getSingleSubmission = async (
         orderBy: { version: "desc" },
         include: {
           reviews: {
-            where: { mentorId: reviewerId },
             orderBy: [{ reviewedAt: "desc" }, { id: "desc" }],
+            include: { mentor: { select: { id: true, name: true } } },
           },
         },
       },

@@ -5,6 +5,7 @@ import { envVariables } from "../../config/env";
 import { UserRole } from "../../generated/prisma/enums";
 import { prisma } from "./prisma";
 import ms from "ms";
+import { authCookieOptions } from "../../config/cookie";
 
 export const auth = betterAuth({
   baseURL: envVariables.BETTER_AUTH_URL,
@@ -22,10 +23,11 @@ export const auth = betterAuth({
       generateId: () => randomUUID(),
     },
     disableCSRFCheck: true,
-    defaultCookieAttributes: {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
+    useSecureCookies: authCookieOptions.secure,
+    defaultCookieAttributes: authCookieOptions,
+    crossSubDomainCookies: {
+      enabled: Boolean(envVariables.COOKIE_DOMAIN),
+      domain: envVariables.COOKIE_DOMAIN,
     },
   },
   user: {
@@ -58,5 +60,5 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [envVariables.BETTER_AUTH_URL],
+  trustedOrigins: [envVariables.BETTER_AUTH_URL, envVariables.FRONTEND_URL],
 });

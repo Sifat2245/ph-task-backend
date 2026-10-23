@@ -7,8 +7,11 @@ import { notFound } from "./app/middleware/notFound";
 import cookieParser from "cookie-parser";
 import status from "http-status";
 import { sendResponse } from "./app/shared/sendResponse";
+import { corsMiddleware } from "./app/middleware/cors";
 
 const app: Application = express();
+
+app.use(corsMiddleware);
 
 app.post("/api/auth/sign-up/email", (_req: Request, res: Response) => {
   sendResponse(res, {

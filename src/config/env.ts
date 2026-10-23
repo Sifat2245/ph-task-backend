@@ -20,6 +20,8 @@ const getTokenDuration = (
 interface EnvConfig {
   NODE_ENV: string;
   PORT: string;
+  FRONTEND_URL: string;
+  COOKIE_DOMAIN?: string;
   DATABASE_URL: string;
   DIRECT_URL: string;
   BETTER_AUTH_URL: string;
@@ -56,6 +58,8 @@ const localEnvVariables = (): EnvConfig => {
   return {
     NODE_ENV: process.env.NODE_ENV as string,
     PORT: process.env.PORT as string,
+    FRONTEND_URL: new URL(process.env.FRONTEND_URL || "http://localhost:3000").origin,
+    COOKIE_DOMAIN: process.env.COOKIE_DOMAIN?.trim() || undefined,
     DATABASE_URL: process.env.DATABASE_URL as string,
     DIRECT_URL: process.env.DIRECT_URL as string,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL as string,

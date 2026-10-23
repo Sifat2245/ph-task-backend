@@ -109,6 +109,8 @@ installed `tsx` loader to resolve the project's extensionless ESM imports;
 | --- | --- | --- |
 | `NODE_ENV` | Runtime environment; required | `development` |
 | `PORT` | HTTP server port; required | `3000` |
+| `FRONTEND_URL` | Frontend origin allowed by credentialed CORS and Better Auth | `http://localhost:3000` |
+| `COOKIE_DOMAIN` | Optional parent domain for sharing auth cookies across frontend/API subdomains | `.submitly.example` |
 | `DATABASE_URL` | Application PostgreSQL connection; required | Pooled URL when available |
 | `DIRECT_URL` | PostgreSQL connection used by Prisma CLI; required | Direct URL |
 | `BETTER_AUTH_URL` | Backend origin used by Better Auth; required | `http://localhost:3000` |
@@ -210,10 +212,14 @@ Better Auth session belonging to the same user. The middleware checks the user's
 current database role. The controllers set `accessToken`, `refreshToken`, and
 `betterAuthSession` cookies and forward Better Auth's signed session cookies.
 
-Cookies use `HttpOnly`, `Secure`, and `SameSite=None`. Send cookies with protected
-requests; browser clients use `credentials: "include"`. Deployed browser flows
-should use HTTPS. The server currently has no CORS middleware, so a frontend on a
-different origin also needs CORS and trusted-origin configuration.
+Cookies remain `HttpOnly`. Development uses `SameSite=Lax` on local HTTP;
+production uses `Secure` and `SameSite=None` and requires HTTPS. Browser clients
+send cookies with `credentials: "include"` or Axios `withCredentials: true`.
+Credentialed CORS and Better Auth trust the configured `FRONTEND_URL` and the
+backend origin. Preflight requests are handled before Better Auth routes.
+Use the same hostname on both local ports. If frontend server-side rendering
+needs cookies across production subdomains, set `COOKIE_DOMAIN` to their shared
+parent domain; leave it unset for host-only cookies.
 
 `GET /api/auth/get-session` is provided by Better Auth and returns its native
 session/user response. The native HTTP signup route `/api/auth/sign-up/email` is
@@ -315,8 +321,10 @@ assignments return `403` on reads and writes.
 
 The submission list contains actual submissions and their latest revisions,
 excluding skips and submission records without revisions. The detail route
-includes all revisions. Both views include student and assignment details and
-the signed-in reviewer's reviews.
+includes all revisions and every review's marks, feedback, review date, and
+reviewer ID/name, newest first. Both views include student and assignment
+details. The list includes the signed-in reviewer's reviews; submission details
+include all reviewers' reviews so admins and mentors can see the same feedback.
 The submission list is paginated and its total counts submissions, excluding
 skips and records without revisions.
 

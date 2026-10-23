@@ -35,7 +35,6 @@ const getAllSubmissions = CatchAsync(async (req: Request, res: Response) => {
 
 const getSingleSubmission = CatchAsync(async (req: Request, res: Response) => {
   const result = await AssignmentReviewService.getSingleSubmission(
-    getAuthSession(res).user.id,
     parseSubmissionId(req.params.id),
   );
   sendResponse(res, {

@@ -62,7 +62,7 @@ const logout = CatchAsync(async (req: Request, res: Response) => {
   }
 
   for (const key of ["accessToken", "refreshToken", "betterAuthSession"]) {
-    cookieUtils.clearCookie(res, key, { secure: true, sameSite: "none" });
+    cookieUtils.clearCookie(res, key);
   }
 
   sendResponse(res, {
